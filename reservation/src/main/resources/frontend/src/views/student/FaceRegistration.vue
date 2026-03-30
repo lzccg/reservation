@@ -1,0 +1,238 @@
+<template>
+  <div class="page-container">
+    <div class="page-header">
+      <h2 class="page-title">人脸信息录入</h2>
+    </div>
+
+    <el-row :gutter="40">
+      <el-col :span="12">
+        <el-card shadow="hover" class="app-card camera-card">
+          <template #header>
+            <div class="camera-header">
+              <span>视频采集</span>
+              <el-tag :type="mediaStream ? 'success' : 'info'">
+                {{ mediaStream ? '摄像头已开启' : '等待开启' }}
+              </el-tag>
+            </div>
+          </template>
+          
+          <div class="video-container">
+            <video ref="videoRef" autoplay playsinline class="face-video"></video>
+            <div class="face-guide" v-if="mediaStream">
+              <div class="guide-box"></div>
+              <p class="guide-text">请将正脸对准取景框</p>
+            </div>
+          </div>
+
+          <div class="action-buttons">
+            <el-button type="primary" v-if="!mediaStream" @click="startCamera">开启摄像头</el-button>
+            <template v-else>
+              <el-button type="success" icon="Camera" @click="captureImage" :loading="capturing">拍摄照片</el-button>
+              <el-button type="danger" @click="stopCamera">关闭摄像头</el-button>
+            </template>
+          </div>
+        </el-card>
+      </el-col>
+
+      <el-col :span="12">
+        <el-card shadow="hover" class="app-card preview-card">
+          <template #header>
+            <div class="camera-header">
+              <span>信息确认与上传</span>
+              <el-tag :type="hasRegistered ? 'success' : 'warning'">
+                {{ hasRegistered ? '已录入' : '未录入' }}
+              </el-tag>
+            </div>
+          </template>
+
+          <div class="preview-container">
+            <img v-if="capturedImage" :src="capturedImage" class="preview-image" alt="Captured Face" />
+            <el-empty v-else description="请先使用摄像头拍摄面部照片" />
+          </div>
+
+          <div class="result-info" v-if="capturedImage">
+            <el-alert
+              :title="qualityText"
+              :type="qualityText.includes('清晰') ? 'success' : 'warning'"
+              show-icon
+              :closable="false"
+              style="margin-bottom: 20px"
+            />
+            <el-button type="primary" style="width: 100%" size="large" @click="uploadFaceData" :loading="uploading">
+              确认上传人脸特征
+            </el-button>
+          </div>
+
+          <div v-if="hasRegistered && !capturedImage" class="registered-hint">
+            <el-icon size="60" color="#67c23a"><CircleCheckFilled /></el-icon>
+            <p>您已成功录入过人脸信息，可正常进行签到。</p>
+            <p>如需更新，请重新拍摄上传。</p>
+          </div>
+        </el-card>
+      </el-col>
+    </el-row>
+
+    <!-- 隐藏的 canvas 用于抓图 -->
+    <canvas ref="canvasRef" style="display: none;"></canvas>
+  </div>
+</template>
+
+<script setup>
+import { ref, onUnmounted } from 'vue'
+import { ElMessage } from 'element-plus'
+
+const videoRef = ref(null)
+const canvasRef = ref(null)
+const mediaStream = ref(null)
+
+const capturedImage = ref(null)
+const capturing = ref(false)
+const uploading = ref(false)
+const qualityText = ref('检测中...')
+
+const hasRegistered = ref(true) // TODO: 真实项目中应从后端获取
+
+const startCamera = async () => {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { width: 640, height: 480, facingMode: 'user' }
+    })
+    mediaStream.value = stream
+    if (videoRef.value) {
+      videoRef.value.srcObject = stream
+    }
+  } catch (err) {
+    ElMessage.error('无法访问摄像头，请检查权限设置')
+    console.error(err)
+  }
+}
+
+const stopCamera = () => {
+  if (mediaStream.value) {
+    mediaStream.value.getTracks().forEach(track => track.stop())
+    mediaStream.value = null
+  }
+}
+
+const captureImage = () => {
+  if (!videoRef.value || !canvasRef.value) return
+  capturing.value = true
+  
+  const video = videoRef.value
+  const canvas = canvasRef.value
+  canvas.width = video.videoWidth
+  canvas.height = video.videoHeight
+  
+  const ctx = canvas.getContext('2d')
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+  
+  const base64Img = canvas.toDataURL('image/jpeg', 0.9)
+  capturedImage.value = base64Img
+  
+  // 模拟质量检测
+  setTimeout(() => {
+    capturing.value = false
+    qualityText.value = '照片质量清晰，人脸完整（符合要求）'
+  }, 500)
+}
+
+const uploadFaceData = () => {
+  uploading.value = true
+  setTimeout(() => {
+    uploading.value = false
+    ElMessage.success('人脸信息上传成功！')
+    hasRegistered.value = true
+    capturedImage.value = null
+  }, 1000)
+}
+
+onUnmounted(() => {
+  stopCamera()
+})
+</script>
+
+<style scoped>
+.camera-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.video-container {
+  position: relative;
+  width: 100%;
+  height: 360px;
+  background-color: #000;
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.face-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1); /* 镜像翻转 */
+}
+
+.face-guide {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+.guide-box {
+  width: 200px;
+  height: 200px;
+  border: 2px dashed #409EFF;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2000px rgba(0, 0, 0, 0.4);
+}
+
+.guide-text {
+  color: #fff;
+  margin-top: 20px;
+  font-size: 16px;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+}
+
+.action-buttons {
+  margin-top: 20px;
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+}
+
+.preview-container {
+  height: 260px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: #f5f7fa;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  border: 1px dashed #dcdfe6;
+}
+
+.preview-image {
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: 8px;
+  transform: scaleX(-1);
+}
+
+.registered-hint {
+  text-align: center;
+  padding: 40px 0;
+  color: #606266;
+}
+</style>
