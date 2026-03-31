@@ -100,6 +100,9 @@
         <el-form-item label="企业全称" prop="name">
           <el-input v-model="companyRegForm.name" placeholder="请输入企业营业执照全称" />
         </el-form-item>
+        <el-form-item label="信用代码" prop="creditCode">
+          <el-input v-model="companyRegForm.creditCode" placeholder="请输入社会统一信用代码" />
+        </el-form-item>
         <el-form-item label="企业所在地" prop="location">
           <el-input v-model="companyRegForm.location" placeholder="如：广东省深圳市" />
         </el-form-item>
@@ -137,10 +140,11 @@
 </template>
 
 <script setup>
-import { reactive, ref, onMounted } from 'vue'
+import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/store/user'
 import { ElMessage } from 'element-plus'
+import { login, register } from '@/api/auth'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -152,28 +156,6 @@ const loginFormRef = ref(null)
 const studentRegFormRef = ref(null)
 const companyRegFormRef = ref(null)
 
-// 模拟本地数据库
-let mockDatabase = {
-  students: [
-    { id: '10001', studentNo: '20210001', phone: '13800000001', password: '123', name: '张三学生', isFirstLogin: true }
-  ],
-  companies: [
-    { id: '20001', contactPhone: '13900000001', password: '123', name: '腾讯科技(深圳)有限公司', isFirstLogin: true }
-  ],
-  admins: [
-    { id: '30001', username: 'admin', password: '123', name: '超级管理员' }
-  ]
-}
-
-onMounted(() => {
-  const db = localStorage.getItem('mockDatabase')
-  if (db) {
-    mockDatabase = JSON.parse(db)
-  } else {
-    localStorage.setItem('mockDatabase', JSON.stringify(mockDatabase))
-  }
-})
-
 // === 登录逻辑 ===
 const loginForm = reactive({ username: '', password: '', role: 'student' })
 const loginRules = {
@@ -184,37 +166,33 @@ const loginRules = {
 
 const handleLogin = () => {
   if (!loginFormRef.value) return
-  loginFormRef.value.validate((valid) => {
+  loginFormRef.value.validate(async (valid) => {
     if (valid) {
       loading.value = true
-      setTimeout(() => {
-        let user = null
-        const { username, password, role } = loginForm
+      try {
+        const data = await login(loginForm)
+        const { user, role, needCompleteProfile } = data
+        userStore.setToken(`token-${user.id || user.studentId || user.companyId || user.adminId}`)
+        userStore.setUserInfo({ ...user, role, isFirstLogin: !!needCompleteProfile })
         
-        if (role === 'admin') {
-          user = mockDatabase.admins.find(u => u.username === username && u.password === password)
-        } else if (role === 'student') {
-          // 学生: id, 学号, 手机号 皆可登录
-          user = mockDatabase.students.find(u => 
-            (u.id === username || u.studentNo === username || u.phone === username) && u.password === password)
-        } else if (role === 'company') {
-          // 企业: id, 手机号 皆可登录
-          user = mockDatabase.companies.find(u => 
-            (u.id === username || u.contactPhone === username) && u.password === password)
-        }
-
-        if (user) {
-          userStore.setToken(`mock-token-${user.id}`)
-          // 将角色信息也合并进去
-          userStore.setUserInfo({ ...user, role })
-          
-          ElMessage.success('登录成功')
-          router.push('/dashboard')
+        ElMessage.success('登录成功')
+        if (needCompleteProfile && role !== 'admin') {
+          ElMessage.warning('首次登录请先到个人信息页完善资料')
+          if (role === 'student') {
+            router.push('/student/profile')
+          } else if (role === 'company') {
+            router.push('/company/profile')
+          } else {
+            router.push('/dashboard')
+          }
         } else {
-          ElMessage.error('账号或密码错误')
+          router.push('/dashboard')
         }
+      } catch (error) {
+        console.error(error)
+      } finally {
         loading.value = false
-      }, 600)
+      }
     }
   })
 }
@@ -230,29 +208,29 @@ const studentRegRules = {
 
 const handleRegisterStudent = () => {
   if (!studentRegFormRef.value) return
-  studentRegFormRef.value.validate((valid) => {
+  studentRegFormRef.value.validate(async (valid) => {
     if (valid) {
       loading.value = true
-      setTimeout(() => {
-        const newId = (10000 + mockDatabase.students.length + 1).toString()
-        const newStudent = { ...studentRegForm, id: newId, isFirstLogin: true }
-        mockDatabase.students.push(newStudent)
-        localStorage.setItem('mockDatabase', JSON.stringify(mockDatabase))
-        
-        ElMessage.success(`注册成功！您的系统分配ID为：${newId}`)
+      try {
+        await register({ ...studentRegForm, role: 'student' })
+        ElMessage.success('注册成功！请登录')
         mode.value = 'login'
-        loginForm.username = newId
+        loginForm.username = studentRegForm.studentNo
         loginForm.role = 'student'
+      } catch (error) {
+        console.error(error)
+      } finally {
         loading.value = false
-      }, 600)
+      }
     }
   })
 }
 
 // === 企业注册逻辑 ===
-const companyRegForm = reactive({ name: '', location: '', industry: '', contactName: '', contactPhone: '', password: '' })
+const companyRegForm = reactive({ name: '', creditCode: '', location: '', industry: '', contactName: '', contactPhone: '', password: '' })
 const companyRegRules = {
   name: [{ required: true, message: '请输入企业全称', trigger: 'blur' }],
+  creditCode: [{ required: true, message: '请输入社会统一信用代码', trigger: 'blur' }],
   location: [{ required: true, message: '请输入所在地', trigger: 'blur' }],
   industry: [{ required: true, message: '请选择行业', trigger: 'change' }],
   contactName: [{ required: true, message: '请输入联系人姓名', trigger: 'blur' }],
@@ -262,21 +240,20 @@ const companyRegRules = {
 
 const handleRegisterCompany = () => {
   if (!companyRegFormRef.value) return
-  companyRegFormRef.value.validate((valid) => {
+  companyRegFormRef.value.validate(async (valid) => {
     if (valid) {
       loading.value = true
-      setTimeout(() => {
-        const newId = (20000 + mockDatabase.companies.length + 1).toString()
-        const newCompany = { ...companyRegForm, id: newId, isFirstLogin: true }
-        mockDatabase.companies.push(newCompany)
-        localStorage.setItem('mockDatabase', JSON.stringify(mockDatabase))
-        
-        ElMessage.success(`注册成功！系统分配企业ID为：${newId}`)
+      try {
+        await register({ ...companyRegForm, role: 'company' })
+        ElMessage.success('注册成功！请等待审核')
         mode.value = 'login'
-        loginForm.username = newId
+        loginForm.username = companyRegForm.contactPhone
         loginForm.role = 'company'
+      } catch (error) {
+        console.error(error)
+      } finally {
         loading.value = false
-      }, 600)
+      }
     }
   })
 }
