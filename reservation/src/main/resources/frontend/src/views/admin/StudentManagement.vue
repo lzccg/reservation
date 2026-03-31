@@ -6,24 +6,18 @@
 
     <el-card shadow="hover" class="app-card" style="margin-bottom: 20px;">
       <el-form :inline="true" :model="searchForm" class="search-form">
-        <el-form-item label="年级">
-          <el-select v-model="searchForm.grade" placeholder="选择年级" clearable>
-            <el-option label="2021级" value="2021" />
-            <el-option label="2022级" value="2022" />
-          </el-select>
+        <el-form-item label="班级">
+          <el-input v-model="searchForm.clazz" placeholder="输入班级" clearable />
         </el-form-item>
         <el-form-item label="专业">
-          <el-select v-model="searchForm.major" placeholder="选择专业" clearable>
-            <el-option label="软件工程" value="Software" />
-            <el-option label="计算机科学" value="CS" />
-            <el-option label="通信工程" value="CE" />
-          </el-select>
+          <el-input v-model="searchForm.major" placeholder="输入专业" clearable />
         </el-form-item>
         <el-form-item label="学生姓名/学号">
           <el-input v-model="searchForm.keyword" placeholder="请输入关键词" clearable />
         </el-form-item>
         <el-form-item>
           <el-button type="primary" icon="Search" @click="fetchData">查询</el-button>
+          <el-button style="margin-left: 10px" @click="handleReset">重置</el-button>
         </el-form-item>
       </el-form>
     </el-card>
@@ -38,10 +32,9 @@
         header-cell-class-name="table-header"
       >
         <el-table-column prop="studentNo" label="学号" width="120" align="center" fixed="left" />
-        <el-table-column prop="name" label="姓名" width="100" align="center" />
-        <el-table-column prop="grade" label="年级" width="100" align="center" />
+        <el-table-column prop="studentName" label="姓名" width="100" align="center" />
         <el-table-column prop="major" label="专业" width="140" show-overflow-tooltip />
-        <el-table-column prop="className" label="班级" width="100" align="center" />
+        <el-table-column prop="clazz" label="班级" width="100" align="center" />
         <el-table-column label="人脸录入状态" width="120" align="center">
           <template #default="{ row }">
             <el-tag :type="row.faceUploaded ? 'success' : 'danger'">
@@ -89,12 +82,11 @@
     <!-- 学生详细信息弹窗 -->
     <el-dialog title="学生详细信息 (关联排单与系统数据)" v-model="detailVisible" width="600px" destroy-on-close>
       <el-descriptions border :column="2" v-if="currentStudent">
-        <el-descriptions-item label="姓名">{{ currentStudent.name }}</el-descriptions-item>
+        <el-descriptions-item label="姓名">{{ currentStudent.studentName }}</el-descriptions-item>
         <el-descriptions-item label="学号">{{ currentStudent.studentNo }}</el-descriptions-item>
-        <el-descriptions-item label="年级">{{ currentStudent.grade }}</el-descriptions-item>
         <el-descriptions-item label="专业">{{ currentStudent.major }}</el-descriptions-item>
-        <el-descriptions-item label="班级">{{ currentStudent.className }}</el-descriptions-item>
-        <el-descriptions-item label="手机号">138****0000</el-descriptions-item>
+        <el-descriptions-item label="班级">{{ currentStudent.clazz }}</el-descriptions-item>
+        <el-descriptions-item label="手机号">{{ currentStudent.phone }}</el-descriptions-item>
         <el-descriptions-item label="人脸状态">
           <el-tag :type="currentStudent.faceUploaded ? 'success' : 'danger'" size="small">
             {{ currentStudent.faceUploaded ? '已建模并授权' : '无基准面部特征' }}
@@ -112,7 +104,7 @@
       
       <el-divider>近期活跃情况评估</el-divider>
       <p style="text-align: center; color: #606266; font-size: 14px;">
-        累计预约 {{ currentStudent?.reserveCount }} 场，出勤率 {{ ((currentStudent?.checkinCount / currentStudent?.reserveCount) * 100).toFixed(1) || 0 }}%，其中迟到场次 {{ currentStudent?.lateCount }} 次。
+        累计预约 {{ currentStudent?.reserveCount }} 场，出勤率 {{ currentStudent?.reserveCount ? ((currentStudent?.checkinCount / currentStudent?.reserveCount) * 100).toFixed(1) : 0 }}%，其中迟到场次 {{ currentStudent?.lateCount }} 次。
       </p>
 
       <template #footer>
@@ -120,6 +112,7 @@
           <div>
             <el-button v-if="currentStudent?.status === 1" type="danger" plain @click="handleStatusToggle(currentStudent)">封禁 / 限制功能</el-button>
             <el-button v-else type="success" @click="handleStatusToggle(currentStudent)">解封 / 恢复账号功能</el-button>
+            <el-button v-if="isSuperAdmin" type="danger" @click="handleDeleteStudent">删除学生</el-button>
           </div>
           <el-button @click="detailVisible = false">关闭窗口</el-button>
         </div>
@@ -130,34 +123,51 @@
 </template>
 
 <script setup>
-import { reactive, ref, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
+import { reactive, ref, onMounted, computed } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { useUserStore } from '@/store/user'
+import { getStudentList, toggleStudentStatus, getStudentDetail, deleteStudent } from '@/api/admin'
 
-const searchForm = reactive({ grade: '', major: '', keyword: '' })
+const searchForm = reactive({ clazz: '', major: '', keyword: '' })
 const tableData = ref([])
 const loading = ref(false)
 const page = reactive({ current: 1, size: 10, total: 0 })
+
+const userStore = useUserStore()
+const isSuperAdmin = computed(() => userStore.userInfo?.adminRoleLevel === 1)
 
 // 弹窗控制
 const detailVisible = ref(false)
 const currentStudent = ref(null)
 
-const fetchData = () => {
+const fetchData = async () => {
   loading.value = true
-  setTimeout(() => {
-    tableData.value = [
-      { id: 1, studentNo: '20210001', name: '李明', grade: '2021级', major: '软件工程', className: '软工1班', faceUploaded: true, reserveCount: 15, checkinCount: 14, lateCount: 0, absentCount: 1, status: 1 },
-      { id: 2, studentNo: '20210002', name: '张华', grade: '2021级', major: '计算机科学', className: '计科2班', faceUploaded: false, reserveCount: 3, checkinCount: 1, lateCount: 1, absentCount: 2, status: 1 },
-      { id: 3, studentNo: '20220005', name: '王强', grade: '2022级', major: '通信工程', className: '通信1班', faceUploaded: true, reserveCount: 8, checkinCount: 7, lateCount: 3, absentCount: 0, status: 1 },
-      { id: 4, studentNo: '20210123', name: '赵信(封禁)', grade: '2021级', major: '软件工程', className: '软工3班', faceUploaded: true, reserveCount: 20, checkinCount: 10, lateCount: 2, absentCount: 10, status: 0 }
-    ]
-    page.total = 4
+  try {
+    const data = await getStudentList({
+      clazz: searchForm.clazz,
+      major: searchForm.major,
+      keyword: searchForm.keyword,
+      current: page.current,
+      size: page.size
+    })
+    tableData.value = data.records || []
+    page.total = data.total || 0
+  } catch (e) {
+    console.error(e)
+  } finally {
     loading.value = false
-  }, 400)
+  }
 }
 
-const handleStatusChange = (row) => {
-  ElMessage.success(`学号 ${row.studentNo} 的账号已${row.status === 1 ? '启用' : '禁用'}`)
+const handleStatusChange = async (row) => {
+  try {
+    await toggleStudentStatus(row.studentId, row.status)
+    ElMessage.success(`学号 ${row.studentNo} 的账号已${row.status === 1 ? '启用' : '禁用'}`)
+    fetchData()
+  } catch (e) {
+    console.error(e)
+    row.status = row.status === 1 ? 0 : 1
+  }
 }
 
 const handleStatusToggle = (row) => {
@@ -165,9 +175,42 @@ const handleStatusToggle = (row) => {
   handleStatusChange(row);
 }
 
-const handleViewDetail = (row) => {
-  currentStudent.value = row
-  detailVisible.value = true
+const handleViewDetail = async (row) => {
+  try {
+    const data = await getStudentDetail(row.studentId)
+    currentStudent.value = data
+    detailVisible.value = true
+  } catch (e) {
+    console.error(e)
+  }
+}
+
+const handleReset = () => {
+  searchForm.clazz = ''
+  searchForm.major = ''
+  searchForm.keyword = ''
+  page.current = 1
+  fetchData()
+}
+
+const handleDeleteStudent = async () => {
+  if (!currentStudent.value) return
+  if ((currentStudent.value.activeReservationCount || 0) > 0) {
+    ElMessage.error('学生有正在进行的宣讲会，无法删除')
+    return
+  }
+  try {
+    await ElMessageBox.confirm('确认删除该学生账号吗？删除后学生将无法登录与使用系统。', '删除确认', { type: 'warning' })
+    await deleteStudent(currentStudent.value.studentId)
+    ElMessage.success('删除成功')
+    detailVisible.value = false
+    currentStudent.value = null
+    fetchData()
+  } catch (e) {
+    if (e && e.message) {
+      console.error(e)
+    }
+  }
 }
 
 onMounted(() => {

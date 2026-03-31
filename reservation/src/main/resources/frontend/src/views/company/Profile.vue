@@ -17,21 +17,21 @@
     <el-card shadow="hover" class="app-card">
       <el-form ref="companyFormRef" :model="companyForm" :rules="companyRules" label-width="160px" style="max-width: 800px;">
         <el-form-item label="企业全称">
-          <el-input v-model="companyForm.name" disabled />
+          <el-input v-model="companyForm.companyName" disabled />
         </el-form-item>
-        <el-form-item label="统一社会信用代码" prop="uscc">
-          <el-input v-model="companyForm.uscc" placeholder="请输入企业统一社会信用代码" />
+        <el-form-item label="统一社会信用代码" prop="creditCode">
+          <el-input v-model="companyForm.creditCode" placeholder="请输入企业统一社会信用代码" />
         </el-form-item>
-        <el-form-item label="企业所在地" prop="location">
-          <el-input v-model="companyForm.location" placeholder="如：广东省深圳市南山区" />
+        <el-form-item label="企业所在地" prop="companyLocation">
+          <el-input v-model="companyForm.companyLocation" placeholder="如：广东省深圳市南山区" />
         </el-form-item>
         <el-form-item label="企业所属行业" prop="industry">
           <el-select v-model="companyForm.industry" style="width: 100%">
-            <el-option label="计算机/互联网" value="Internet" />
-            <el-option label="金融/保险" value="Finance" />
-            <el-option label="教育/培训" value="Education" />
-            <el-option label="制造/工业" value="Manufacture" />
-            <el-option label="其他" value="Other" />
+            <el-option label="计算机/互联网" value="计算机/互联网" />
+            <el-option label="金融/保险" value="金融/保险" />
+            <el-option label="教育/培训" value="教育/培训" />
+            <el-option label="制造/工业" value="制造/工业" />
+            <el-option label="其他" value="其他" />
           </el-select>
         </el-form-item>
         <el-form-item label="企业联系人姓名" prop="contactName">
@@ -44,52 +44,158 @@
           <el-input v-model="companyForm.address" placeholder="请输入能精确到门牌号的详细地址" />
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" :loading="savingInfo" @click="saveCompanyInfo">提交审核资质</el-button>
+          <el-button type="primary" :loading="savingInfo" @click="saveCompanyInfo">{{ submitText }}</el-button>
         </el-form-item>
       </el-form>
+    </el-card>
+
+    <el-card shadow="hover" class="app-card" style="margin-top: 20px;">
+      <template #header>
+        <span>账号审核状态</span>
+      </template>
+      <el-descriptions border :column="2">
+        <el-descriptions-item label="企业状态">
+          <el-tag :type="statusTagType">{{ statusText }}</el-tag>
+        </el-descriptions-item>
+        <el-descriptions-item label="最近修改时间">
+          {{ formatDateTime(companyMeta.updateTime) }}
+        </el-descriptions-item>
+        <el-descriptions-item label="账号审核通过时间">
+          {{ auditTimeDisplay }}
+        </el-descriptions-item>
+        <el-descriptions-item label="管理员审核备注">
+          {{ companyMeta.auditRemark || '-' }}
+        </el-descriptions-item>
+      </el-descriptions>
     </el-card>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, reactive } from 'vue'
+import { ref, computed, reactive, onMounted } from 'vue'
 import { useUserStore } from '@/store/user'
 import { ElMessage } from 'element-plus'
+import { getCompanyProfile, updateCompanyProfile } from '@/api/company'
 
 const userStore = useUserStore()
 const userInfo = computed(() => userStore.userInfo)
 
 const savingInfo = ref(false)
 const companyFormRef = ref(null)
+const companyMeta = reactive({
+  status: null,
+  updateTime: null,
+  auditTime: null,
+  auditRemark: ''
+})
 
 const companyForm = reactive({
-  name: userInfo.value?.name || '',
-  uscc: '',
-  location: userInfo.value?.location || '',
+  companyName: userInfo.value?.companyName || '',
+  creditCode: userInfo.value?.creditCode || '',
+  companyLocation: userInfo.value?.companyLocation || '',
   industry: userInfo.value?.industry || '',
   contactName: userInfo.value?.contactName || '',
   contactPhone: userInfo.value?.contactPhone || '',
-  address: ''
+  address: userInfo.value?.address || ''
 })
 
 const companyRules = {
-  uscc: [{ required: true, message: '必填项', trigger: 'blur' }],
-  location: [{ required: true, message: '必填项', trigger: 'blur' }],
+  creditCode: [{ required: true, message: '必填项', trigger: 'blur' }],
+  companyLocation: [{ required: true, message: '必填项', trigger: 'blur' }],
   industry: [{ required: true, message: '必填项', trigger: 'change' }],
   contactName: [{ required: true, message: '必填项', trigger: 'blur' }],
   contactPhone: [{ required: true, message: '必填项', trigger: 'blur' }],
   address: [{ required: true, message: '必填项', trigger: 'blur' }]
 }
 
+const isBlank = (v) => v === null || v === undefined || `${v}`.trim() === ''
+
+const isComplete = computed(() => {
+  return !isBlank(companyForm.creditCode)
+    && !isBlank(companyForm.companyLocation)
+    && !isBlank(companyForm.industry)
+    && !isBlank(companyForm.contactName)
+    && !isBlank(companyForm.contactPhone)
+    && !isBlank(companyForm.address)
+})
+
+const submitText = computed(() => (userInfo.value?.isFirstLogin ? '提交审核资质' : '修改审核资质'))
+
+const formatDateTime = (value) => {
+  if (!value) return '-'
+  const s = String(value)
+  if (s.includes('T')) {
+    const t = s.replace('T', ' ')
+    return t.length >= 16 ? t.slice(0, 16) : t
+  }
+  return s.length >= 16 ? s.slice(0, 16) : s
+}
+
+const statusText = computed(() => {
+  const s = companyMeta.status
+  if (s === 1) return '正常'
+  if (s === 2) return '驳回'
+  return '待审核'
+})
+
+const statusTagType = computed(() => {
+  const s = companyMeta.status
+  if (s === 1) return 'success'
+  if (s === 2) return 'danger'
+  return 'warning'
+})
+
+const auditTimeDisplay = computed(() => {
+  if (companyMeta.status === 1) {
+    return formatDateTime(companyMeta.auditTime)
+  }
+  return statusText.value
+})
+
+const loadProfile = async () => {
+  const data = await getCompanyProfile()
+  companyForm.companyName = data.companyName || ''
+  companyForm.creditCode = data.creditCode || ''
+  companyForm.companyLocation = data.companyLocation || ''
+  companyForm.industry = data.industry || ''
+  companyForm.contactName = data.contactName || ''
+  companyForm.contactPhone = data.contactPhone || ''
+  companyForm.address = data.address || ''
+  companyMeta.status = data.status ?? null
+  companyMeta.updateTime = data.updateTime || null
+  companyMeta.auditTime = data.auditTime || null
+  companyMeta.auditRemark = data.auditRemark || ''
+  userStore.setUserInfo({ ...userInfo.value, ...data, isFirstLogin: !isComplete.value })
+}
+
+onMounted(async () => {
+  try {
+    await loadProfile()
+  } catch (e) {
+    console.error(e)
+  }
+})
+
 const saveCompanyInfo = () => {
-  companyFormRef.value.validate(valid => {
-    if (valid) {
-      savingInfo.value = true
-      setTimeout(() => {
-        savingInfo.value = false
-        ElMessage.success('资质信息已提交审核！')
-        userStore.setUserInfo({ ...userInfo.value, ...companyForm, isFirstLogin: false })
-      }, 500)
+  if (!companyFormRef.value) return
+  companyFormRef.value.validate(async (valid) => {
+    if (!valid) return
+    savingInfo.value = true
+    try {
+      await updateCompanyProfile({
+        creditCode: companyForm.creditCode,
+        companyLocation: companyForm.companyLocation,
+        industry: companyForm.industry,
+        contactName: companyForm.contactName,
+        contactPhone: companyForm.contactPhone,
+        address: companyForm.address
+      })
+      await loadProfile()
+      ElMessage.success(isComplete.value ? '资质信息修改成功！' : '资质信息已提交审核！')
+    } catch (e) {
+      console.error(e)
+    } finally {
+      savingInfo.value = false
     }
   })
 }

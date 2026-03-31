@@ -106,7 +106,7 @@
           <el-dropdown @command="handleCommand" style="margin-left: 15px;">
             <span class="el-dropdown-link userinfo">
               <el-avatar :size="32" icon="UserFilled" style="margin-right: 8px" />
-              {{ userInfo?.name || userInfo?.username || '用户' }}
+              {{ displayName }}
               <el-icon class="el-icon--right"><arrow-down /></el-icon>
             </span>
             <template #dropdown>
@@ -156,6 +156,7 @@ import { ref, computed, reactive } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '@/store/user'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { changePassword } from '@/api/auth'
 
 const router = useRouter()
 const route = useRoute()
@@ -169,6 +170,11 @@ const activeMenu = computed(() => route.path)
 const toggleCollapse = () => {
   isCollapse.value = !isCollapse.value
 }
+
+const displayName = computed(() => {
+  const info = userInfo.value || {}
+  return info.studentName || info.companyName || info.adminName || info.name || info.username || '用户'
+})
 
 // === 修改密码逻辑 ===
 const pwdDialogVisible = ref(false)
@@ -203,6 +209,10 @@ const handleCommand = (command) => {
       ElMessage.success('已退出登录')
     }).catch(() => {})
   } else if (command === 'password') {
+    if (role.value !== 'student' && role.value !== 'company' && role.value !== 'admin') {
+      ElMessage.error('当前角色不支持修改密码')
+      return
+    }
     pwdForm.oldPassword = ''
     pwdForm.newPassword = ''
     pwdForm.confirmPassword = ''
@@ -210,21 +220,45 @@ const handleCommand = (command) => {
   }
 }
 
-const handleUpdatePwd = () => {
+const getPasswordUsername = () => {
+  const info = userInfo.value || {}
+  if (role.value === 'student') {
+    return info.studentNo || info.phone || ''
+  }
+  if (role.value === 'company') {
+    return info.contactPhone || ''
+  }
+  if (role.value === 'admin') {
+    return info.adminName || ''
+  }
+  return ''
+}
+
+const handleUpdatePwd = async () => {
   if (!pwdFormRef.value) return
-  pwdFormRef.value.validate((valid) => {
-    if (valid) {
-      if (pwdForm.oldPassword !== userInfo.value.password) {
-        return ElMessage.error('原密码不正确！')
-      }
-      pwdLoading.value = true
-      setTimeout(() => {
-        pwdLoading.value = false
-        pwdDialogVisible.value = false
-        ElMessage.success('密码修改成功，请重新登录！')
-        userStore.logout()
-        router.push('/login')
-      }, 500)
+  pwdFormRef.value.validate(async (valid) => {
+    if (!valid) return
+    const username = getPasswordUsername()
+    if (!username) {
+      ElMessage.error('缺少账号信息，无法修改密码')
+      return
+    }
+    pwdLoading.value = true
+    try {
+      await changePassword({
+        role: role.value,
+        username,
+        oldPassword: pwdForm.oldPassword,
+        newPassword: pwdForm.newPassword
+      })
+      pwdDialogVisible.value = false
+      ElMessage.success('密码修改成功，请重新登录！')
+      userStore.logout()
+      router.push('/login')
+    } catch (e) {
+      console.error(e)
+    } finally {
+      pwdLoading.value = false
     }
   })
 }
