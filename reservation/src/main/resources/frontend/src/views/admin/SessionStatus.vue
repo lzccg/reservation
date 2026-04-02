@@ -12,16 +12,17 @@
         </el-form-item>
         <el-form-item label="活动状态">
           <el-select v-model="searchForm.status" placeholder="宣讲会状态" clearable style="width: 150px">
-            <el-option label="待审核" value="pending" />
-            <el-option label="已通过" value="approved" />
-            <el-option label="已发布" value="published" />
-            <el-option label="已结束" value="ended" />
-            <el-option label="已驳回" value="rejected" />
-            <el-option label="已取消" value="canceled" />
+            <el-option label="待审核" :value="0" />
+            <el-option label="已审核" :value="1" />
+            <el-option label="已发布" :value="2" />
+            <el-option label="已结束" :value="3" />
+            <el-option label="已取消" :value="4" />
+            <el-option label="已驳回" :value="5" />
           </el-select>
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" icon="Search" @click="fetchData">综合筛选</el-button>
+          <el-button type="primary" icon="Search" @click="handleSearch">搜索</el-button>
+          <el-button style="margin-left: 10px" @click="handleReset">重置</el-button>
         </el-form-item>
       </el-form>
     </el-card>
@@ -35,22 +36,23 @@
         header-cell-class-name="table-header"
       >
         <el-table-column prop="companyName" label="关联企业" width="180" show-overflow-tooltip />
-        <el-table-column prop="title" label="宣讲会标题" min-width="220" show-overflow-tooltip />
-        <el-table-column prop="time" label="申请档期" width="160" />
-        <el-table-column prop="location" label="审核场地" width="150" show-overflow-tooltip />
+        <el-table-column prop="sessionTitle" label="宣讲会标题" min-width="220" show-overflow-tooltip />
+        <el-table-column label="申请档期" width="220">
+          <template #default="{ row }">
+            {{ formatTimeRange(row.startTime, row.endTime) }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="sessionLocation" label="审核场地" width="180" show-overflow-tooltip />
         <el-table-column prop="capacity" label="申报总容纳" width="100" align="center" />
         <el-table-column prop="status" label="当前状态" width="100" align="center">
           <template #default="{ row }">
-            <el-tag :type="getStatusType(row.status)">{{ getStatusName(row.status) }}</el-tag>
+            <el-tag :type="getStatusType(row.sessionStatus)">{{ getStatusName(row.sessionStatus) }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column label="操作指令" width="220" align="center" fixed="right">
           <template #default="{ row }">
             <el-button size="small" type="primary" link icon="View" @click="handleViewSessionDialog(row)">
               详情与审核
-            </el-button>
-            <el-button size="small" type="warning" link icon="Monitor" v-if="row.status === 'published'" @click="openKiosk(row)">
-              开启大屏
             </el-button>
           </template>
         </el-table-column>
@@ -67,31 +69,47 @@
         <el-descriptions border :column="2" style="margin-bottom: 20px;">
           <el-descriptions-item label="企业方">{{ currentSession.companyName }}</el-descriptions-item>
           <el-descriptions-item label="当前状态">
-            <el-tag :type="getStatusType(currentSession.status)">{{ getStatusName(currentSession.status) }}</el-tag>
+            <el-tag :type="getStatusType(currentSession.sessionStatus)">{{ getStatusName(currentSession.sessionStatus) }}</el-tag>
           </el-descriptions-item>
-          <el-descriptions-item label="活动全称" :span="2">{{ currentSession.title }}</el-descriptions-item>
-          <el-descriptions-item label="最初预约档期">{{ currentSession.time }}</el-descriptions-item>
-          <el-descriptions-item label="最初期望容纳">{{ currentSession.capacity }}</el-descriptions-item>
-          <el-descriptions-item label="内容说明短文" :span="2">这是一个校招集中大型选拔现场，包含笔试、初面以及高管面对面互动等核心环节... (模拟详细信息)</el-descriptions-item>
+          <el-descriptions-item label="活动全称" :span="2">{{ currentSession.sessionTitle }}</el-descriptions-item>
+          <el-descriptions-item label="最初预约档期" :span="2">{{ formatTimeRange(currentSession.startTime, currentSession.endTime) }}</el-descriptions-item>
+          <el-descriptions-item label="申报总容纳">{{ currentSession.capacity }}</el-descriptions-item>
+          <el-descriptions-item label="剩余座位">{{ currentSession.remainingSeats ?? '-' }}</el-descriptions-item>
+          <el-descriptions-item label="宣讲内容" :span="2">{{ currentSession.description || '-' }}</el-descriptions-item>
+          <el-descriptions-item v-if="currentSession.sessionStatus === 1" label="审核时间" :span="2">{{ formatDateTime(currentSession.auditTime) }}</el-descriptions-item>
+          <el-descriptions-item v-if="currentSession.sessionStatus === 5" label="审核时间" :span="2">{{ formatDateTime(currentSession.auditTime) }}</el-descriptions-item>
+          <el-descriptions-item v-if="currentSession.sessionStatus === 5" label="审核备注" :span="2">{{ currentSession.auditRemark || '-' }}</el-descriptions-item>
+          <el-descriptions-item v-if="currentSession.sessionStatus === 2" label="发布时间" :span="2">{{ formatDateTime(currentSession.publishTime) }}</el-descriptions-item>
+          <el-descriptions-item v-if="currentSession.sessionStatus === 3" label="发布时间" :span="2">{{ formatDateTime(currentSession.publishTime) }}</el-descriptions-item>
+          <el-descriptions-item v-if="currentSession.sessionStatus === 4" label="取消原因" :span="2">{{ currentSession.cancelReason || '-' }}</el-descriptions-item>
+          <el-descriptions-item v-if="currentSession.sessionStatus === 3 || currentSession.sessionStatus === 4" label="签到人数" :span="2">{{ checkinCount }}</el-descriptions-item>
         </el-descriptions>
 
         <!-- 管理员直接在这个窗口覆盖系统资源表单 -->
         <h4 style="margin: 0 0 15px;">系统资源干预分配 (可强制覆盖修改)</h4>
         <el-form ref="editFormRef" :model="editForm" label-width="100px" size="small" border>
-          <el-form-item label="活动标题" prop="title">
-            <el-input v-model="editForm.title" />
+          <el-form-item label="活动标题" prop="sessionTitle">
+            <el-input v-model="editForm.sessionTitle" :disabled="readOnly" />
           </el-form-item>
-          <el-form-item label="审批场地" prop="location">
-            <el-input v-model="editForm.location" />
+          <el-form-item label="审批场地" prop="sessionLocation">
+            <el-input v-model="editForm.sessionLocation" :disabled="readOnly" />
           </el-form-item>
-          <el-form-item label="审批档期" prop="time">
-            <el-date-picker v-model="editForm.time" type="datetime" value-format="YYYY-MM-DD HH:mm:ss" style="width: 100%" />
+          <el-form-item label="审批档期" prop="timeRange">
+            <el-date-picker
+              v-model="editForm.timeRange"
+              type="datetimerange"
+              start-placeholder="开始时间"
+              end-placeholder="结束时间"
+              value-format="YYYY-MM-DDTHH:mm:ss"
+              style="width: 100%"
+              :disabled="readOnly"
+            />
           </el-form-item>
           <el-form-item label="容纳核准席位" prop="capacity">
-            <el-input-number v-model="editForm.capacity" :min="10" />
+            <el-input-number v-model="editForm.capacity" :min="10" :disabled="readOnly" />
           </el-form-item>
-          <el-form-item v-if="currentSession.status === 'pending' || editForm.forceUpdateRemarks">
-            <el-button type="primary" plain @click="submitForceEdit">保存对表单项的强制干预配置</el-button>
+          <el-form-item>
+            <el-button type="primary" plain :disabled="readOnly" @click="submitForceEdit">保存对表单项的强制干预配置</el-button>
           </el-form-item>
         </el-form>
       </div>
@@ -99,13 +117,12 @@
       <template #footer>
         <span class="dialog-footer" style="display: flex; justify-content: space-between;">
           <div>
-            <el-button v-if="['approved', 'published'].includes(currentSession?.status)" type="danger" plain @click="handleForceCancel(currentSession)">强制叫停活动</el-button>
-            <el-button v-if="currentSession?.status === 'published'" type="warning" plain icon="Monitor" @click="openKiosk(currentSession)" style="margin-left: 10px;">启动现场人脸签到屏</el-button>
+            <el-button v-if="[1, 2].includes(currentSession?.sessionStatus)" type="danger" plain @click="handleForceCancel(currentSession)">强制叫停活动</el-button>
           </div>
 
           <div>
             <el-button @click="sessionDialogVisible = false">关闭</el-button>
-            <template v-if="currentSession?.status === 'pending'">
+            <template v-if="currentSession?.sessionStatus === 0">
               <el-button type="danger" @click="handleReject(currentSession)">拒绝并打回</el-button>
               <el-button type="success" @click="handleApprove(currentSession)">基于当前干预表单通过</el-button>
             </template>
@@ -117,12 +134,12 @@
 </template>
 
 <script setup>
-import { reactive, ref, onMounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { reactive, ref, onMounted, computed } from 'vue'
+import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { getAllSessions, getSessionDetail, auditSession } from '@/api/admin'
 
 const route = useRoute()
-const router = useRouter()
 const searchForm = reactive({ companyName: '', status: '' })
 const tableData = ref([])
 const loading = ref(false)
@@ -131,62 +148,156 @@ const page = reactive({ current: 1, size: 10, total: 0 })
 // 详情控制
 const sessionDialogVisible = ref(false)
 const currentSession = ref(null)
-const editForm = reactive({})
+const editFormRef = ref(null)
+const editForm = reactive({
+  sessionTitle: '',
+  sessionLocation: '',
+  timeRange: [],
+  capacity: 0,
+  description: ''
+})
+const checkinCount = ref(0)
 
-const fetchData = () => {
+const readOnly = computed(() => {
+  const s = currentSession.value?.sessionStatus
+  return s === 3 || s === 4
+})
+
+const handleSearch = () => {
+  page.current = 1
+  fetchData()
+}
+
+const handleReset = () => {
+  searchForm.companyName = ''
+  searchForm.status = ''
+  page.current = 1
+  fetchData()
+}
+
+const normalizeDateTime = (v) => {
+  if (!v) return ''
+  const s = String(v)
+  return s.includes('T') ? s.replace('T', ' ') : s
+}
+
+const normalizeIsoDateTime = (v) => {
+  if (!v) return ''
+  let s = String(v).trim()
+  if (!s) return ''
+  if (s.includes(' ')) {
+    s = s.replace(' ', 'T')
+  }
+  const dot = s.indexOf('.')
+  if (dot > 0) {
+    s = s.slice(0, dot)
+  }
+  if (s.length === 16) {
+    s = s + ':00'
+  }
+  return s
+}
+
+const formatDateTime = (v) => {
+  const s = normalizeDateTime(v)
+  if (!s) return '-'
+  return s.length >= 16 ? s.slice(0, 16) : s
+}
+
+const formatTimeRange = (start, end) => {
+  const s = normalizeDateTime(start)
+  const e = normalizeDateTime(end)
+  if (!s || !e) return '-'
+  const date = s.slice(0, 10)
+  const st = s.slice(11, 16)
+  const et = e.slice(11, 16)
+  return `${date} ${st}-${et}`
+}
+
+const fetchData = async () => {
   loading.value = true
-  setTimeout(() => {
-    tableData.value = [
-      { id: 201, companyName: '腾讯科技（深圳）有限公司', title: '腾讯2025校园招聘宣讲会', time: '2025-04-10 14:00:00', location: '大学生活动中心', capacity: 800, status: 'published' },
-      { id: 202, companyName: '阿里巴巴（中国）有限公司', title: '阿里淘天秋招', time: '2025-04-20 18:30:00', location: '计算机大楼报告厅', capacity: 300, status: 'pending' },
-      { id: 204, companyName: '字节跳动', title: '字节电商内推宣讲', time: '2024-03-10 10:00:00', location: '体育馆', capacity: 1000, status: 'ended' },
-      { id: 206, companyName: '违规企业', title: '虚假职位宣讲会', time: '2025-04-15 14:00:00', location: '未定场地', capacity: 100, status: 'canceled' }
-    ]
-    page.total = 4
+  try {
+    const data = await getAllSessions({
+      companyName: searchForm.companyName,
+      status: searchForm.status === '' ? undefined : searchForm.status,
+      current: page.current,
+      size: page.size
+    })
+    tableData.value = data.records || []
+    page.total = data.total || 0
+  } catch (e) {
+    console.error(e)
+  } finally {
     loading.value = false
-  }, 400)
+  }
 }
 
 const getStatusName = (status) => {
-  const map = { pending: '待审场地', approved: '同意举办', published: '已发布', rejected: '被驳回', ended: '已结束', canceled: '已取消' }
+  const map = { 0: '待审核', 1: '已审核', 2: '已发布', 3: '已结束', 4: '已取消', 5: '已打回' }
   return map[status] || status
 }
 
 const getStatusType = (status) => {
-  const map = { pending: 'warning', approved: 'primary', published: 'success', rejected: 'danger', ended: 'info', canceled: 'info' }
+  const map = { 0: 'warning', 1: 'primary', 2: 'success', 3: 'info', 4: 'info', 5: 'danger' }
   return map[status] || 'info'
 }
 
-const handleViewSessionDialog = (row) => {
-  currentSession.value = row
-  // 将原版数据赋值进修改干预表单内
-  Object.assign(editForm, {
-    title: row.title,
-    time: row.time,
-    location: row.location,
-    capacity: row.capacity,
-    forceUpdateRemarks: false
-  })
-  sessionDialogVisible.value = true
+const handleViewSessionDialog = async (row) => {
+  try {
+    const data = await getSessionDetail(row.sessionId)
+    const s = data.session
+    currentSession.value = { ...s, companyName: data.companyName }
+    checkinCount.value = data.checkinCount || 0
+    Object.assign(editForm, {
+      sessionTitle: s.sessionTitle || '',
+      sessionLocation: s.sessionLocation || '',
+      timeRange: [normalizeIsoDateTime(s.startTime), normalizeIsoDateTime(s.endTime)],
+      capacity: s.capacity || 0,
+      description: s.description || ''
+    })
+    sessionDialogVisible.value = true
+  } catch (e) {
+    console.error(e)
+  }
 }
 
 // 保存强制配置
-const submitForceEdit = () => {
-  ElMessage.success('管理员覆盖修改本地暂存成功，审核时将使用此表数据！')
-  editForm.forceUpdateRemarks = true // 标记修改
+const submitForceEdit = async () => {
+  if (!currentSession.value) return
+  if (readOnly.value) return
+  try {
+    await auditSession(currentSession.value.sessionId, 'update', {
+      sessionTitle: editForm.sessionTitle,
+      sessionLocation: editForm.sessionLocation,
+      startTime: editForm.timeRange?.[0],
+      endTime: editForm.timeRange?.[1],
+      capacity: editForm.capacity,
+      description: editForm.description
+    })
+    ElMessage.success('已保存干预配置')
+    await fetchData()
+  } catch (e) {
+    console.error(e)
+  }
 }
 
 // 调度审核通过
-const handleApprove = (row) => {
-  ElMessage.success(`您已用场地[${editForm.location}]批准了这次通过调度请求！`)
-  // 模拟将表单结果同步更新到行资源上
-  row.title = editForm.title
-  row.time = editForm.time
-  row.location = editForm.location
-  row.capacity = editForm.capacity
-  
-  row.status = 'approved'
-  sessionDialogVisible.value = false
+const handleApprove = async (row) => {
+  try {
+    await auditSession(row.sessionId, 'approve', {
+      sessionTitle: editForm.sessionTitle,
+      sessionLocation: editForm.sessionLocation,
+      startTime: editForm.timeRange?.[0],
+      endTime: editForm.timeRange?.[1],
+      capacity: editForm.capacity,
+      description: editForm.description
+    })
+    ElMessage.success('已审核通过')
+    sessionDialogVisible.value = false
+    await fetchData()
+  } catch (e) {
+    console.error(e)
+  }
 }
 
 const handleReject = (row) => {
@@ -196,24 +307,22 @@ const handleReject = (row) => {
     inputPattern: /.+/,
     inputErrorMessage: '驳回理由不能为空'
   }).then(({ value }) => {
-    ElMessage.success('活动已驳回！消息已通知企业。')
-    row.status = 'rejected'
-    row.remarks = value
-    sessionDialogVisible.value = false
+    auditSession(row.sessionId, 'reject', { auditRemark: value }).then(async () => {
+      ElMessage.success('活动已打回')
+      sessionDialogVisible.value = false
+      await fetchData()
+    })
   }).catch(() => {})
 }
 
 const handleForceCancel = (row) => {
   ElMessageBox.confirm(`强制停办将取消所有已报名的学生名额并退回票务权重，您确定要强制停办该活动吗？`, '最高权限介入', { type: 'error' }).then(() => {
-    ElMessage.success('系统拦截：活动已被强制停办关闭！')
-    row.status = 'canceled'
-    sessionDialogVisible.value = false
+    auditSession(row.sessionId, 'cancel').then(async () => {
+      ElMessage.success('活动已被管理员叫停并取消')
+      sessionDialogVisible.value = false
+      await fetchData()
+    })
   }).catch(() => {})
-}
-
-const openKiosk = (row) => {
-  const routeUrl = router.resolve({ path: '/kiosk/checkin', query: { sessionId: row.id } })
-  window.open(routeUrl.href, '_blank')
 }
 
 onMounted(() => {

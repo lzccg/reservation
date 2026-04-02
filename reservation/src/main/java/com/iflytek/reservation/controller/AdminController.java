@@ -7,6 +7,7 @@ import com.iflytek.reservation.entity.Checkin;
 import com.iflytek.reservation.entity.Company;
 import com.iflytek.reservation.entity.FaceData;
 import com.iflytek.reservation.entity.Reservation;
+import com.iflytek.reservation.entity.Session;
 import com.iflytek.reservation.entity.Student;
 import com.iflytek.reservation.mapper.CheckinMapper;
 import com.iflytek.reservation.mapper.FaceDataMapper;
@@ -33,7 +34,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Stream;
 import java.util.stream.Collectors;
 import java.time.LocalDateTime;
 
@@ -174,7 +174,7 @@ public class AdminController {
         LocalDateTime now = LocalDateTime.now();
         long active = sessionMapper.selectCount(new QueryWrapper<com.iflytek.reservation.entity.Session>()
                 .eq("company_id", id)
-                .in("session_status", Stream.of(1, 2).collect(Collectors.toList()))
+                .eq("session_status", 2)
                 .ge("end_time", now));
         if (active > 0) {
             return Result.error("该企业有正在进行的宣讲会，无法注销");
@@ -184,6 +184,247 @@ public class AdminController {
         update.setStatus(3);
         boolean ok = companyService.updateById(update);
         return ok ? Result.success("已注销") : Result.error("注销失败");
+    }
+
+    @GetMapping("/sessions")
+    public Result<?> listSessions(
+            @RequestParam(required = false) String companyName,
+            @RequestParam(required = false) Integer status,
+            @RequestParam(defaultValue = "1") long current,
+            @RequestParam(defaultValue = "10") long size
+    ) {
+        long safeCurrent = Math.max(1, current);
+        long safeSize = Math.max(1, size);
+        long offset = (safeCurrent - 1) * safeSize;
+
+        List<Long> companyIdsFilter = null;
+        if (companyName != null && !companyName.isBlank()) {
+            List<Map<String, Object>> maps = companyService.listMaps(new QueryWrapper<Company>()
+                    .select("company_id")
+                    .like("company_name", companyName.trim()));
+            companyIdsFilter = maps.stream()
+                    .map(m -> ((Number) m.get("company_id")).longValue())
+                    .distinct()
+                    .collect(Collectors.toList());
+            if (companyIdsFilter.isEmpty()) {
+                Map<String, Object> data = new HashMap<>();
+                data.put("records", new ArrayList<>());
+                data.put("total", 0);
+                data.put("current", safeCurrent);
+                data.put("size", safeSize);
+                return Result.success(data);
+            }
+        }
+
+        QueryWrapper<Session> countWrapper = new QueryWrapper<>();
+        if (status != null) {
+            countWrapper.eq("session_status", status);
+        }
+        if (companyIdsFilter != null) {
+            countWrapper.in("company_id", companyIdsFilter);
+        }
+        long total = sessionMapper.selectCount(countWrapper);
+
+        QueryWrapper<Session> wrapper = new QueryWrapper<>();
+        if (status != null) {
+            wrapper.eq("session_status", status);
+        }
+        if (companyIdsFilter != null) {
+            wrapper.in("company_id", companyIdsFilter);
+        }
+        wrapper.orderByDesc("session_id");
+        wrapper.last("LIMIT " + offset + "," + safeSize);
+        List<Session> sessions = sessionMapper.selectList(wrapper);
+
+        Set<Long> companyIds = sessions.stream()
+                .map(Session::getCompanyId)
+                .filter(id -> id != null)
+                .collect(Collectors.toSet());
+        Map<Long, String> companyNameMap = new HashMap<>();
+        if (!companyIds.isEmpty()) {
+            List<Company> companies = companyService.list(new QueryWrapper<Company>()
+                    .select("company_id", "company_name")
+                    .in("company_id", companyIds));
+            for (Company c : companies) {
+                companyNameMap.put(c.getCompanyId(), c.getCompanyName());
+            }
+        }
+
+        List<Map<String, Object>> records = new ArrayList<>();
+        for (Session s : sessions) {
+            Map<String, Object> row = new HashMap<>();
+            row.put("sessionId", s.getSessionId());
+            row.put("companyId", s.getCompanyId());
+            row.put("companyName", companyNameMap.getOrDefault(s.getCompanyId(), "-"));
+            row.put("sessionTitle", s.getSessionTitle());
+            row.put("startTime", s.getStartTime());
+            row.put("endTime", s.getEndTime());
+            row.put("sessionLocation", s.getSessionLocation());
+            row.put("capacity", s.getCapacity());
+            row.put("sessionStatus", s.getSessionStatus());
+            records.add(row);
+        }
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("records", records);
+        data.put("total", total);
+        data.put("current", safeCurrent);
+        data.put("size", safeSize);
+        return Result.success(data);
+    }
+
+    @GetMapping("/session/{id}")
+    public Result<?> sessionDetail(@PathVariable("id") Long id) {
+        Session s = sessionMapper.selectById(id);
+        if (s == null) {
+            return Result.error(404, "宣讲会不存在");
+        }
+        Company c = s.getCompanyId() == null ? null : companyService.getById(s.getCompanyId());
+        long checkinCount = 0;
+        if (s.getSessionStatus() != null && (s.getSessionStatus() == 3 || s.getSessionStatus() == 4)) {
+            checkinCount = checkinMapper.selectCount(new QueryWrapper<Checkin>()
+                    .eq("session_id", id)
+                    .eq("checkin_status", 0));
+        }
+        Map<String, Object> data = new HashMap<>();
+        data.put("session", s);
+        data.put("companyName", c == null ? "-" : c.getCompanyName());
+        data.put("checkinCount", checkinCount);
+        return Result.success(data);
+    }
+
+    @PostMapping("/session/{id}/audit")
+    public Result<?> auditSession(@PathVariable("id") Long id, @RequestBody Map<String, Object> body) {
+        Session existing = sessionMapper.selectById(id);
+        if (existing == null) {
+            return Result.error(404, "宣讲会不存在");
+        }
+        Integer status = existing.getSessionStatus();
+        String action = body.get("action") == null ? null : String.valueOf(body.get("action"));
+        if (action == null || action.isBlank()) {
+            return Result.error("缺少action参数");
+        }
+        if (status != null && (status == 3 || status == 4)) {
+            return Result.error("已结束或已取消的宣讲会不可修改");
+        }
+
+        String title = body.get("sessionTitle") == null ? null : String.valueOf(body.get("sessionTitle"));
+        String location = body.get("sessionLocation") == null ? null : String.valueOf(body.get("sessionLocation"));
+        String description = body.get("description") == null ? null : String.valueOf(body.get("description"));
+        String startStr = body.get("startTime") == null ? null : String.valueOf(body.get("startTime")).trim();
+        String endStr = body.get("endTime") == null ? null : String.valueOf(body.get("endTime")).trim();
+        LocalDateTime startTime = (startStr == null || startStr.isBlank()) ? null : LocalDateTime.parse(startStr);
+        LocalDateTime endTime = (endStr == null || endStr.isBlank()) ? null : LocalDateTime.parse(endStr);
+        Integer capacity = body.get("capacity") instanceof Number ? ((Number) body.get("capacity")).intValue() : null;
+
+        if ("update".equalsIgnoreCase(action)) {
+            boolean ok = applySessionUpdate(existing, title, location, startTime, endTime, capacity, description);
+            return ok ? Result.success("已更新") : Result.error("更新失败");
+        }
+
+        if ("approve".equalsIgnoreCase(action)) {
+            if (status == null || status != 0) {
+                return Result.error("当前状态不允许审核通过");
+            }
+            boolean ok = applySessionUpdate(existing, title, location, startTime, endTime, capacity, description);
+            if (!ok) {
+                return Result.error("更新失败");
+            }
+            boolean ok2 = sessionMapper.update(null, new UpdateWrapper<Session>()
+                    .eq("session_id", id)
+                    .eq("session_status", 0)
+                    .set("session_status", 1)
+                    .set("audit_time", LocalDateTime.now())
+                    .set("audit_remark", null)
+                    .set("update_time", LocalDateTime.now())) > 0;
+            return ok2 ? Result.success("已审核") : Result.error("操作失败");
+        }
+
+        if ("reject".equalsIgnoreCase(action)) {
+            if (status == null || status != 0) {
+                return Result.error("当前状态不允许驳回");
+            }
+            String remark = body.get("auditRemark") == null ? null : String.valueOf(body.get("auditRemark"));
+            if (remark == null || remark.isBlank()) {
+                return Result.error("驳回理由不能为空");
+            }
+            boolean ok = sessionMapper.update(null, new UpdateWrapper<Session>()
+                    .eq("session_id", id)
+                    .eq("session_status", 0)
+                    .set("session_status", 5)
+                    .set("audit_time", LocalDateTime.now())
+                    .set("audit_remark", remark)
+                    .set("update_time", LocalDateTime.now())) > 0;
+            return ok ? Result.success("已打回") : Result.error("操作失败");
+        }
+
+        if ("cancel".equalsIgnoreCase(action)) {
+            if (status == null || !(status == 1 || status == 2)) {
+                return Result.error("当前状态不允许叫停");
+            }
+            boolean ok = sessionMapper.update(null, new UpdateWrapper<Session>()
+                    .eq("session_id", id)
+                    .in("session_status", 1, 2)
+                    .set("session_status", 4)
+                    .set("cancel_reason", "管理员叫停")
+                    .set("update_time", LocalDateTime.now())) > 0;
+            return ok ? Result.success("已取消") : Result.error("叫停失败");
+        }
+
+        return Result.error("未知action参数");
+    }
+
+    private boolean applySessionUpdate(Session existing, String title, String location, LocalDateTime startTime, LocalDateTime endTime, Integer capacity, String description) {
+        Integer status = existing.getSessionStatus();
+        if (capacity != null && capacity <= 0) {
+            return false;
+        }
+        if ((startTime != null || endTime != null) && (startTime == null || endTime == null || !endTime.isAfter(startTime))) {
+            return false;
+        }
+        UpdateWrapper<Session> uw = new UpdateWrapper<>();
+        uw.eq("session_id", existing.getSessionId());
+        boolean any = false;
+        if (title != null) {
+            uw.set("session_title", title);
+            any = true;
+        }
+        if (location != null) {
+            uw.set("session_location", location);
+            any = true;
+        }
+        if (description != null) {
+            uw.set("description", description);
+            any = true;
+        }
+        if (startTime != null && endTime != null) {
+            uw.set("start_time", startTime);
+            uw.set("end_time", endTime);
+            if (status != null && status == 2) {
+                uw.set("checkin_start", startTime.minusMinutes(20));
+                uw.set("checkin_end", startTime.plusMinutes(15));
+            }
+            any = true;
+        }
+        if (capacity != null) {
+            if (status != null && status == 2) {
+                Integer oldCap = existing.getCapacity() == null ? 0 : existing.getCapacity();
+                Integer oldRemain = existing.getRemainingSeats() == null ? 0 : existing.getRemainingSeats();
+                int used = Math.max(0, oldCap - oldRemain);
+                int newRemain = Math.max(0, capacity - used);
+                uw.set("capacity", capacity);
+                uw.set("remaining_seats", newRemain);
+            } else {
+                uw.set("capacity", capacity);
+                uw.set("remaining_seats", capacity);
+            }
+            any = true;
+        }
+        if (!any) {
+            return true;
+        }
+        uw.set("update_time", LocalDateTime.now());
+        return sessionMapper.update(null, uw) > 0;
     }
 
     @GetMapping("/students")

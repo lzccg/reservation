@@ -16,6 +16,10 @@ export const reserveSession = (sessionId) => {
   return request({ url: `/student/reserve/${sessionId}`, method: 'post' })
 }
 
+export const getSessionDetail = (sessionId) => {
+  return request({ url: `/student/session/${sessionId}`, method: 'get' })
+}
+
 export const getReserveHistory = () => {
   return request({ url: '/student/history', method: 'get' })
 }

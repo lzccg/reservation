@@ -19,3 +19,15 @@ export const updateSession = (id, data) => {
 export const getCompanySessions = (params) => {
   return request({ url: '/company/sessions', method: 'get', params })
 }
+
+export const getSessionDetail = (id) => {
+  return request({ url: `/company/session/${id}`, method: 'get' })
+}
+
+export const confirmPublishSession = (id) => {
+  return request({ url: `/company/session/${id}/publish`, method: 'post' })
+}
+
+export const cancelSession = (id, cancelReason) => {
+  return request({ url: `/company/session/${id}/cancel`, method: 'post', data: { cancelReason } })
+}

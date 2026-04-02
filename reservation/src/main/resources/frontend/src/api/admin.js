@@ -40,6 +40,10 @@ export const getAllSessions = (params) => {
   return request({ url: '/admin/sessions', method: 'get', params })
 }
 
+export const getSessionDetail = (id) => {
+  return request({ url: `/admin/session/${id}`, method: 'get' })
+}
+
 export const auditSession = (id, action, data) => {
   return request({ url: `/admin/session/${id}/audit`, method: 'post', data: { action, ...data } })
 }
