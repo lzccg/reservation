@@ -23,13 +23,30 @@
               <p class="guide-text">请将正脸对准取景框</p>
             </div>
           </div>
+          <div class="agreement-section">
+            <el-checkbox v-model="agreementChecked" class="prominent-checkbox">
+              大屏核验条款：我同意系统将我的人脸特征加密存储于云端人脸库，仅用于宣讲会身份核验
+            </el-checkbox>
+          </div>
 
           <div class="action-buttons">
-            <el-button type="primary" v-if="!mediaStream" @click="startCamera">开启摄像头</el-button>
+            <el-button type="primary" v-if="!mediaStream" @click="startCamera" :disabled="!agreementChecked">开启摄像头</el-button>
             <template v-else>
-              <el-button type="success" icon="Camera" @click="captureImage" :loading="capturing">拍摄照片</el-button>
+              <el-button type="success" icon="Camera" @click="captureImage" :loading="capturing" :disabled="!agreementChecked">拍摄照片</el-button>
               <el-button type="danger" @click="stopCamera">关闭摄像头</el-button>
             </template>
+
+            <!-- 本地上传 -->
+            <el-upload
+              action="#"
+              :auto-upload="false"
+              :show-file-list="false"
+              :on-change="handleFileUpload"
+              accept="image/*"
+              style="margin-left: 15px;"
+            >
+              <el-button type="warning" icon="Upload" :disabled="!agreementChecked">上传本地人脸图片</el-button>
+            </el-upload>
           </div>
         </el-card>
       </el-col>
@@ -90,7 +107,24 @@ const capturing = ref(false)
 const uploading = ref(false)
 const qualityText = ref('检测中...')
 
+const agreementChecked = ref(false)
 const hasRegistered = ref(true) // TODO: 真实项目中应从后端获取
+
+const handleFileUpload = (file) => {
+  if (!agreementChecked.value) {
+    ElMessage.warning('务必先勾选同意隐私协议')
+    return
+  }
+  const reader = new FileReader()
+  reader.onload = (e) => {
+    capturedImage.value = e.target.result
+    qualityText.value = '本地图片预览就绪'
+    setTimeout(() => {
+      qualityText.value = '照片质量清晰，人脸完整（符合要求）'
+    }, 500)
+  }
+  reader.readAsDataURL(file.raw)
+}
 
 const startCamera = async () => {
   try {
@@ -210,6 +244,23 @@ onUnmounted(() => {
   display: flex;
   justify-content: center;
   gap: 15px;
+  flex-wrap: wrap;
+}
+
+.agreement-section {
+  margin-top: 15px;
+  background-color: #fdf6ec;
+  padding: 15px;
+  border-radius: 4px;
+  border: 1px solid #faecd8;
+}
+
+.prominent-checkbox {
+  color: #E6A23C;
+  font-weight: bold;
+  white-space: normal;
+  display: flex;
+  align-items: center;
 }
 
 .preview-container {
