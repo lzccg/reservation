@@ -42,7 +42,7 @@
               :auto-upload="false"
               :show-file-list="false"
               :on-change="handleFileUpload"
-              accept="image/*"
+              accept="image/jpeg,image/png"
               style="margin-left: 15px;"
             >
               <el-button type="warning" icon="Upload" :disabled="!agreementChecked">上传本地人脸图片</el-button>
@@ -64,7 +64,7 @@
 
           <div class="preview-container">
             <img v-if="capturedImage" :src="capturedImage" class="preview-image" alt="Captured Face" />
-            <el-empty v-else description="请先使用摄像头拍摄面部照片" />
+            <el-empty v-else description="请先使用摄像头拍摄或上传面部照片" />
           </div>
 
           <div class="result-info" v-if="capturedImage">
@@ -95,35 +95,55 @@
 </template>
 
 <script setup>
-import { ref, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { ElMessage } from 'element-plus'
+import { getFaceStatus, uploadFaceInfo } from '@/api/checkin'
 
 const videoRef = ref(null)
 const canvasRef = ref(null)
 const mediaStream = ref(null)
 
 const capturedImage = ref(null)
+const capturedFile = ref(null)
 const capturing = ref(false)
 const uploading = ref(false)
 const qualityText = ref('检测中...')
 
 const agreementChecked = ref(false)
-const hasRegistered = ref(true) // TODO: 真实项目中应从后端获取
+const hasRegistered = ref(false)
+
+const validateFile = (file) => {
+  const maxSize = 5 * 1024 * 1024
+  const name = file?.name || ''
+  const ext = name.includes('.') ? name.split('.').pop().toLowerCase() : ''
+  const okExt = ['jpg', 'jpeg', 'png'].includes(ext)
+  if (!okExt) {
+    return { ok: false, message: '格式错误，仅支持 jpg、jpeg、png' }
+  }
+  if (!file?.size || file.size > maxSize) {
+    return { ok: false, message: '大小限制，图片需小于5MB' }
+  }
+  return { ok: true }
+}
 
 const handleFileUpload = (file) => {
   if (!agreementChecked.value) {
     ElMessage.warning('务必先勾选同意隐私协议')
     return
   }
+  const raw = file?.raw
+  const check = validateFile(raw)
+  if (!check.ok) {
+    ElMessage.error(check.message)
+    return
+  }
+  capturedFile.value = raw
   const reader = new FileReader()
   reader.onload = (e) => {
     capturedImage.value = e.target.result
-    qualityText.value = '本地图片预览就绪'
-    setTimeout(() => {
-      qualityText.value = '照片质量清晰，人脸完整（符合要求）'
-    }, 500)
+    qualityText.value = '图片已就绪，请点击“确认上传人脸特征”进行检测'
   }
-  reader.readAsDataURL(file.raw)
+  reader.readAsDataURL(raw)
 }
 
 const startCamera = async () => {
@@ -150,6 +170,10 @@ const stopCamera = () => {
 
 const captureImage = () => {
   if (!videoRef.value || !canvasRef.value) return
+  if (!agreementChecked.value) {
+    ElMessage.warning('务必先勾选同意隐私协议')
+    return
+  }
   capturing.value = true
   
   const video = videoRef.value
@@ -162,23 +186,58 @@ const captureImage = () => {
   
   const base64Img = canvas.toDataURL('image/jpeg', 0.9)
   capturedImage.value = base64Img
-  
-  // 模拟质量检测
-  setTimeout(() => {
+
+  canvas.toBlob((blob) => {
     capturing.value = false
-    qualityText.value = '照片质量清晰，人脸完整（符合要求）'
-  }, 500)
+    if (!blob) {
+      ElMessage.error('拍摄失败，请重试')
+      return
+    }
+    const file = new File([blob], 'capture.jpg', { type: 'image/jpeg' })
+    const check = validateFile(file)
+    if (!check.ok) {
+      ElMessage.error(check.message)
+      capturedImage.value = null
+      capturedFile.value = null
+      return
+    }
+    capturedFile.value = file
+    qualityText.value = '图片已就绪，请点击“确认上传人脸特征”进行检测'
+  }, 'image/jpeg', 0.9)
 }
 
-const uploadFaceData = () => {
+const uploadFaceData = async () => {
+  if (!agreementChecked.value) {
+    ElMessage.warning('务必先勾选同意隐私协议')
+    return
+  }
+  if (!capturedFile.value) {
+    ElMessage.warning('请先拍摄或上传图片')
+    return
+  }
   uploading.value = true
-  setTimeout(() => {
+  try {
+    const res = await uploadFaceInfo(capturedFile.value)
     uploading.value = false
     ElMessage.success('人脸信息上传成功！')
     hasRegistered.value = true
+    qualityText.value = `检测通过，质量分：${res?.qualityScore ?? '-'}`
     capturedImage.value = null
-  }, 1000)
+    capturedFile.value = null
+  } catch (e) {
+    uploading.value = false
+    qualityText.value = e?.response?.data?.message || e?.message || '上传失败'
+  }
 }
+
+onMounted(async () => {
+  try {
+    const res = await getFaceStatus()
+    hasRegistered.value = !!res?.hasRegistered
+  } catch (e) {
+    hasRegistered.value = false
+  }
+})
 
 onUnmounted(() => {
   stopCamera()
