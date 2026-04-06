@@ -25,7 +25,7 @@
           </div>
           <div class="agreement-section">
             <el-checkbox v-model="agreementChecked" class="prominent-checkbox">
-              大屏核验条款：我同意系统将我的人脸特征加密存储于云端人脸库，仅用于宣讲会身份核验
+              核验条款：我同意系统将我的人脸特征加密存储于云端人脸库，仅用于宣讲会身份核验
             </el-checkbox>
           </div>
 

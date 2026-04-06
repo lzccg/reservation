@@ -541,6 +541,17 @@ public class AdminController {
         Student update = new Student();
         update.setStudentId(id);
         update.setStatus(status);
+        if (status == 0) {
+            update.setLimitTime(java.time.LocalDateTime.now());
+        } else if (status == 1) {
+            update.setLimitTime(null);
+            // MyBatis-Plus 默认不更新 null，需要用 UpdateWrapper
+            studentService.update(new com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper<Student>()
+                    .eq("student_id", id)
+                    .set("status", 1)
+                    .set("limit_time", null));
+            return Result.success("操作成功");
+        }
         boolean ok = studentService.updateById(update);
         if (!ok) {
             return Result.error("更新失败");
@@ -579,6 +590,12 @@ public class AdminController {
         data.put("absentCount", absentCount);
         data.put("activeReservationCount", activeReservationCount);
         data.put("status", student.getStatus());
+        data.put("limitTime", student.getLimitTime());
+        if (student.getStatus() != null && student.getStatus() == 0 && student.getLimitTime() != null) {
+            data.put("unbanTime", student.getLimitTime().plusDays(7));
+        } else {
+            data.put("unbanTime", null);
+        }
         return Result.success(data);
     }
 

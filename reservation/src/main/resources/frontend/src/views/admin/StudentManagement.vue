@@ -100,6 +100,12 @@
             {{ currentStudent.status === 1 ? '功能正常启用' : '已限制功能 (如禁止预约等)' }}
           </el-tag>
         </el-descriptions-item>
+        <el-descriptions-item label="封禁日期">
+          {{ formatDateTime(currentStudent.limitTime) || '-' }}
+        </el-descriptions-item>
+        <el-descriptions-item label="解封日期">
+          {{ formatDateTime(currentStudent.unbanTime) || '-' }}
+        </el-descriptions-item>
       </el-descriptions>
       
       <el-divider>近期活跃情况评估</el-divider>
@@ -216,6 +222,13 @@ const handleDeleteStudent = async () => {
 onMounted(() => {
   fetchData()
 })
+
+const formatDateTime = (v) => {
+  if (!v) return ''
+  const s = String(v)
+  const norm = s.includes('T') ? s.replace('T', ' ') : s
+  return norm.length >= 16 ? norm.slice(0, 16) : norm
+}
 </script>
 
 <style scoped>

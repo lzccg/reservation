@@ -44,6 +44,7 @@ public class StudentReservationController {
         if (student == null || (student.getStatus() != null && student.getStatus() == 2)) {
             return Result.error(404, "用户不存在");
         }
+        studentService.refreshStudentStatus(student);
         if (student.getStatus() == null || student.getStatus() != 1) {
             return Result.error(403, "当前账号状态禁止预约");
         }

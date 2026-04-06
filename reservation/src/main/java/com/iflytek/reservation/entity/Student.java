@@ -21,4 +21,6 @@ public class Student {
     private String clazz;
     private String college;
     private Integer status;
+    private java.time.LocalDateTime limitTime;
+    private java.time.LocalDateTime unbanTime;
 }

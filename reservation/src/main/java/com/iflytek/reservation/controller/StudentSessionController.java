@@ -46,6 +46,56 @@ public class StudentSessionController {
     @Autowired
     private StudentService studentService;
 
+    @GetMapping("/checkin/latest")
+    public Result<?> latestReservedSession(HttpServletRequest request) {
+        Long studentId = AuthTokenUtil.extractId(request);
+        if (studentId == null) {
+            return Result.error(401, "未登录");
+        }
+        Student student = studentService.getById(studentId);
+        if (student == null || (student.getStatus() != null && student.getStatus() == 2)) {
+            return Result.error(404, "用户不存在");
+        }
+        studentService.refreshStudentStatus(student);
+
+        LocalDateTime now = LocalDateTime.now();
+
+        QueryWrapper<Reservation> rw = new QueryWrapper<>();
+        rw.eq("student_id", studentId);
+        rw.eq("reservation_status", 0);
+        rw.orderByAsc("reservation_time");
+        List<Reservation> reservations = reservationMapper.selectList(rw);
+        if (reservations == null || reservations.isEmpty()) {
+            return Result.success(null);
+        }
+
+        List<Long> sessionIds = reservations.stream().map(Reservation::getSessionId).collect(Collectors.toList());
+        if (sessionIds.isEmpty()) {
+            return Result.success(null);
+        }
+
+        QueryWrapper<Session> sw = new QueryWrapper<>();
+        sw.in("session_id", sessionIds);
+        sw.eq("session_status", 2);
+        sw.gt("start_time", now);
+        sw.orderByAsc("start_time");
+        sw.last("LIMIT 1");
+        Session s = sessionMapper.selectOne(sw);
+        if (s == null) {
+            return Result.success(null);
+        }
+
+        Company c = s.getCompanyId() == null ? null : companyMapper.selectById(s.getCompanyId());
+        Map<String, Object> data = new HashMap<>();
+        data.put("sessionId", s.getSessionId());
+        data.put("sessionTitle", s.getSessionTitle());
+        data.put("companyName", c == null ? "-" : c.getCompanyName());
+        data.put("startTime", s.getStartTime());
+        data.put("endTime", s.getEndTime());
+        data.put("sessionLocation", s.getSessionLocation());
+        return Result.success(data);
+    }
+
     @GetMapping("/sessions")
     public Result<?> listSessions(
             HttpServletRequest request,
@@ -63,6 +113,7 @@ public class StudentSessionController {
         if (student == null || (student.getStatus() != null && student.getStatus() == 2)) {
             return Result.error(404, "用户不存在");
         }
+        studentService.refreshStudentStatus(student);
 
         long safeCurrent = Math.max(1, current);
         long safeSize = Math.max(1, size);
@@ -84,6 +135,9 @@ public class StudentSessionController {
                 data.put("current", safeCurrent);
                 data.put("size", safeSize);
                 data.put("studentStatus", student.getStatus());
+                if (student.getStatus() != null && student.getStatus() == 0 && student.getLimitTime() != null) {
+                    data.put("unbanTime", student.getLimitTime().plusDays(7));
+                }
                 return Result.success(data);
             }
         }
@@ -194,6 +248,9 @@ public class StudentSessionController {
         data.put("current", safeCurrent);
         data.put("size", safeSize);
         data.put("studentStatus", student.getStatus());
+        if (student.getStatus() != null && student.getStatus() == 0 && student.getLimitTime() != null) {
+            data.put("unbanTime", student.getLimitTime().plusDays(7));
+        }
         return Result.success(data);
     }
 

@@ -20,6 +20,14 @@ export const getSessionDetail = (sessionId) => {
   return request({ url: `/student/session/${sessionId}`, method: 'get' })
 }
 
-export const getReserveHistory = () => {
-  return request({ url: '/student/history', method: 'get' })
+export const getLatestReservedSession = () => {
+  return request({ url: '/student/checkin/latest', method: 'get' })
+}
+
+export const getReserveHistory = (params) => {
+  return request({ url: '/student/history', method: 'get', params })
+}
+
+export const cancelReservation = (reservationId) => {
+  return request({ url: '/student/reservation/cancel', method: 'post', params: { reservationId } })
 }

@@ -31,3 +31,7 @@ export const confirmPublishSession = (id) => {
 export const cancelSession = (id, cancelReason) => {
   return request({ url: `/company/session/${id}/cancel`, method: 'post', data: { cancelReason } })
 }
+
+export const getCheckinRecords = (params) => {
+  return request({ url: '/company/checkin-records', method: 'get', params })
+}

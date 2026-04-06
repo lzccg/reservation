@@ -36,21 +36,47 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import { getLatestReservedSession } from '@/api/student'
 
 const latestSession = ref(null)
 
 onMounted(() => {
-  // 模拟获取最近的一场宣讲会
-  setTimeout(() => {
-    latestSession.value = { 
-      id: 201, 
-      companyName: '腾讯科技', 
-      title: '腾讯2025校园招聘宣讲会', 
-      time: '2025-04-10 14:00', 
-      location: '大学生活动中心' 
+  getLatestReservedSession().then((data) => {
+    if (!data) {
+      latestSession.value = null
+      return
     }
-  }, 300)
+    const start = normalizeDateTime(data.startTime)
+    const end = normalizeDateTime(data.endTime)
+    latestSession.value = {
+      id: data.sessionId,
+      companyName: data.companyName,
+      title: data.sessionTitle,
+      time: formatTimeRange(start, end),
+      location: data.sessionLocation
+    }
+  }).catch(() => {
+    latestSession.value = null
+  })
 })
+
+const normalizeDateTime = (v) => {
+  if (!v) return ''
+  const s = String(v)
+  return s.includes('T') ? s.replace('T', ' ') : s
+}
+
+const formatTimeRange = (start, end) => {
+  if (!start || !end) return '-'
+  const date = start.slice(0, 10)
+  const st = start.slice(11, 16)
+  const ed = end.slice(0, 10)
+  const et = end.slice(11, 16)
+  if (date && date === ed) {
+    return `${date} ${st} - ${et}`
+  }
+  return `${start.slice(0, 16)} - ${end.slice(0, 16)}`
+}
 </script>
 
 <style scoped>

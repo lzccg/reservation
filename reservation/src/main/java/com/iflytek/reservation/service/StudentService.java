@@ -7,4 +7,5 @@ public interface StudentService extends IService<Student> {
     Student login(String username, String password);
     boolean register(Student student);
     boolean changePassword(String username, String oldPassword, String newPassword);
+    void refreshStudentStatus(Student student);
 }

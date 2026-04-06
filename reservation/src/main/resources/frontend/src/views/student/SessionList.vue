@@ -7,6 +7,15 @@
       </el-tag>
     </div>
 
+    <el-alert
+      v-if="!canReserve && unbanTime"
+      :title="'您的账号因违规目前被限制预约功能，预计解封时间：' + unbanTime"
+      type="error"
+      show-icon
+      :closable="false"
+      style="margin-bottom: 20px;"
+    />
+
     <!-- 搜索筛选区 -->
     <el-card shadow="hover" class="app-card" style="margin-bottom: 20px;">
       <el-form :inline="true" :model="searchForm" class="search-form">
@@ -153,6 +162,8 @@ const formatTimeRange = (start, end) => {
   return `${date} ${st}-${et}`
 }
 
+const unbanTime = ref('')
+
 const fetchData = async () => {
   loading.value = true
   try {
@@ -169,6 +180,11 @@ const fetchData = async () => {
     page.total = data.total || 0
     if (data.studentStatus !== undefined && data.studentStatus !== null) {
       userStore.setUserInfo({ ...userStore.userInfo, status: data.studentStatus })
+    }
+    if (data.unbanTime) {
+      unbanTime.value = normalizeDateTime(data.unbanTime)
+    } else {
+      unbanTime.value = ''
     }
   } catch (e) {
     console.error(e)
