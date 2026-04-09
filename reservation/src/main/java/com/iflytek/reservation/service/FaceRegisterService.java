@@ -1,17 +1,25 @@
 package com.iflytek.reservation.service;
 
+import com.aliyun.facebody20191230.models.AddFaceEntityRequest;
+import com.aliyun.facebody20191230.models.AddFaceAdvanceRequest;
+import com.aliyun.facebody20191230.models.AddFaceRequest;
+import com.aliyun.facebody20191230.models.CreateFaceDbRequest;
+import com.aliyun.facebody20191230.models.DeleteFaceEntityRequest;
 import com.aliyun.facebody20191230.models.DetectFaceAdvanceRequest;
 import com.aliyun.facebody20191230.models.DetectFaceResponse;
 import com.aliyun.oss.ClientException;
 import com.aliyun.oss.OSS;
 import com.aliyun.oss.OSSException;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.aliyun.tea.TeaException;
 import com.iflytek.reservation.entity.FaceData;
 import com.iflytek.reservation.entity.Student;
 import com.iflytek.reservation.integration.aliyun.AliyunClients;
 import com.iflytek.reservation.mapper.FaceDataMapper;
 import com.iflytek.reservation.mapper.StudentMapper;
 import com.aliyun.teautil.models.RuntimeOptions;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -26,12 +34,18 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class FaceRegisterService {
 
+    private static final Logger log = LoggerFactory.getLogger(FaceRegisterService.class);
+
     private static final long MAX_SIZE_BYTES = 5L * 1024 * 1024;
     private static final double MIN_QUALITY_SCORE = 85.0;
+    private static final String FACE_DB_NAME_ENV = "RESERVATION_FACE_DB_NAME";
+    private static final String DEFAULT_FACE_DB_NAME = "reservation_face_date";
+    private static final Map<String, Boolean> FACE_DB_READY = new ConcurrentHashMap<>();
 
     @Autowired
     private AliyunClients aliyunClients;
@@ -141,6 +155,8 @@ public class FaceRegisterService {
             throw e;
         }
 
+        syncToFaceDb(student, faceUrl, bytes);
+
         Map<String, Object> result = new HashMap<>();
         result.put("faceFeature", base64);
         result.put("faceUrl", faceUrl);
@@ -194,6 +210,98 @@ public class FaceRegisterService {
             return null;
         }
         return scoreList.get(0).doubleValue();
+    }
+
+    private void syncToFaceDb(Student student, String faceUrl, byte[] bytes) {
+        if (student == null || student.getStudentId() == null || faceUrl == null || faceUrl.isBlank() || bytes == null || bytes.length == 0) {
+            return;
+        }
+
+        String dbName = System.getenv(FACE_DB_NAME_ENV);
+        if (dbName == null || dbName.isBlank()) {
+            dbName = DEFAULT_FACE_DB_NAME;
+        } else {
+            dbName = dbName.trim();
+        }
+
+        String entityId = String.valueOf(student.getStudentId());
+        String extraData = student.getStudentName() == null ? "" : student.getStudentName();
+        RuntimeOptions runtime = new RuntimeOptions();
+
+        ensureFaceDb(dbName, runtime);
+
+        try {
+            DeleteFaceEntityRequest del = new DeleteFaceEntityRequest()
+                    .setDbName(dbName)
+                    .setEntityId(entityId);
+            aliyunClients.faceClient().deleteFaceEntityWithOptions(del, runtime);
+        } catch (TeaException e) {
+            log.warn("deleteFaceEntity failed, code={}, message={}, dbName={}, entityId={}", e.getCode(), e.getMessage(), dbName, entityId);
+        } catch (Exception e) {
+            log.warn("deleteFaceEntity failed, dbName={}, entityId={}", dbName, entityId, e);
+        }
+
+        try {
+            AddFaceEntityRequest addFaceEntityRequest = new AddFaceEntityRequest()
+                    .setDbName(dbName)
+                    .setEntityId(entityId);
+            aliyunClients.faceClient().addFaceEntityWithOptions(addFaceEntityRequest, runtime);
+        } catch (TeaException e) {
+            log.warn("addFaceEntity failed, code={}, message={}, dbName={}, entityId={}", e.getCode(), e.getMessage(), dbName, entityId);
+        } catch (Exception e) {
+            log.warn("addFaceEntity failed, dbName={}, entityId={}", dbName, entityId, e);
+        }
+
+        try {
+            AddFaceRequest addFaceRequest = new AddFaceRequest()
+                    .setDbName(dbName)
+                    .setImageUrl(faceUrl)
+                    .setEntityId(entityId)
+                    .setExtraData(extraData);
+            aliyunClients.faceClient().addFaceWithOptions(addFaceRequest, runtime);
+        } catch (TeaException e) {
+            if ("InvalidImage.Region".equals(e.getCode())) {
+                try {
+                    AddFaceAdvanceRequest addFaceAdvanceRequest = new AddFaceAdvanceRequest()
+                            .setDbName(dbName)
+                            .setEntityId(entityId)
+                            .setExtraData(extraData)
+                            .setImageUrlObject(new ByteArrayInputStream(bytes));
+                    aliyunClients.faceClient().addFaceAdvance(addFaceAdvanceRequest, runtime);
+                    return;
+                } catch (TeaException e2) {
+                    log.warn("addFaceAdvance failed, code={}, message={}, dbName={}, entityId={}, imageUrl={}", e2.getCode(), e2.getMessage(), dbName, entityId, faceUrl);
+                } catch (Exception e2) {
+                    log.warn("addFaceAdvance failed, dbName={}, entityId={}, imageUrl={}", dbName, entityId, faceUrl, e2);
+                }
+            }
+            log.warn("addFace failed, code={}, message={}, dbName={}, entityId={}, imageUrl={}", e.getCode(), e.getMessage(), dbName, entityId, faceUrl);
+        } catch (Exception e) {
+            log.warn("addFace failed, dbName={}, entityId={}, imageUrl={}", dbName, entityId, faceUrl, e);
+        }
+    }
+
+    private void ensureFaceDb(String dbName, RuntimeOptions runtime) {
+        if (dbName == null || dbName.isBlank()) {
+            return;
+        }
+        if (FACE_DB_READY.putIfAbsent(dbName, true) != null) {
+            return;
+        }
+        try {
+            CreateFaceDbRequest req = new CreateFaceDbRequest().setName(dbName);
+            aliyunClients.faceClient().createFaceDbWithOptions(req, runtime);
+        } catch (TeaException e) {
+            String msg = e.getMessage();
+            if (msg != null && msg.contains("db has existed")) {
+                return;
+            }
+            log.warn("createFaceDb failed, code={}, message={}, dbName={}", e.getCode(), msg, dbName);
+            FACE_DB_READY.remove(dbName);
+        } catch (Exception e) {
+            log.warn("createFaceDb failed, dbName={}", dbName, e);
+            FACE_DB_READY.remove(dbName);
+        }
     }
 }
 

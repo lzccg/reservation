@@ -181,7 +181,7 @@ public class CompanyCheckinRecordsController {
         wb.write(out);
         wb.close();
 
-        String baseName = (session.getSessionTitle() == null ? "宣讲会" : session.getSessionTitle()) + "学生签到信息.xlsx";
+        String baseName = (session.getSessionTitle() == null ? "宣讲会" : session.getSessionTitle()) + "+学生签到信息.xlsx";
         String fileName = URLEncoder.encode(baseName, StandardCharsets.UTF_8).replaceAll("\\+", "%20");
 
         return ResponseEntity.ok()
