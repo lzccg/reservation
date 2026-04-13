@@ -89,6 +89,10 @@ public class LoginController {
             if (industry == null) {
                 return Result.error("所属行业不合法");
             }
+            String email = (String) params.get("email");
+            if (email == null || email.isBlank()) {
+                return Result.error("请输入企业邮箱");
+            }
             Company company = new Company();
             company.setCompanyName((String) params.get("name"));
             company.setCreditCode((String) params.get("creditCode"));
@@ -96,12 +100,13 @@ public class LoginController {
             company.setIndustry(industry);
             company.setContactName((String) params.get("contactName"));
             company.setContactPhone((String) params.get("contactPhone"));
+            company.setEmail(email);
             company.setPassword((String) params.get("password"));
             boolean success = companyService.register(company);
             if (success) {
                 return Result.success("注册成功");
             }
-            return Result.error("社会信用代码或联系人电话已存在");
+            return Result.error("社会信用代码、联系人电话或邮箱已存在");
         }
         return Result.error("未知的角色类型");
     }
@@ -144,6 +149,7 @@ public class LoginController {
                 || isBlank(company.getIndustry())
                 || isBlank(company.getContactName())
                 || isBlank(company.getContactPhone())
+                || isBlank(company.getEmail())
                 || isBlank(company.getAddress());
     }
 

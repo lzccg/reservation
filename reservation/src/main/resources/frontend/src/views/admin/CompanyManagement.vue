@@ -74,6 +74,7 @@
           <el-descriptions-item label="企业所在地">{{ currentCompany.companyLocation || '（详细区域未填）' }}</el-descriptions-item>
           <el-descriptions-item label="联系人">{{ currentCompany.contactName }}</el-descriptions-item>
           <el-descriptions-item label="联系电话">{{ currentCompany.contactPhone }}</el-descriptions-item>
+          <el-descriptions-item label="企业邮箱">{{ currentCompany.email || '-' }}</el-descriptions-item>
           <el-descriptions-item label="办公详细地址" :span="2">{{ currentCompany.address || '（暂无精确地址）' }}</el-descriptions-item>
         </el-descriptions>
         

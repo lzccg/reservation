@@ -121,6 +121,9 @@
         <el-form-item label="联系人电话" prop="contactPhone">
           <el-input v-model="companyRegForm.contactPhone" placeholder="请输入企业联系人电话" />
         </el-form-item>
+        <el-form-item label="企业电子邮箱" prop="email">
+          <el-input v-model="companyRegForm.email" placeholder="请输入企业电子邮箱" />
+        </el-form-item>
         <el-form-item label="企业登录密码" prop="password">
           <el-input v-model="companyRegForm.password" type="password" placeholder="请输入登录密码" show-password />
         </el-form-item>
@@ -227,7 +230,7 @@ const handleRegisterStudent = () => {
 }
 
 // === 企业注册逻辑 ===
-const companyRegForm = reactive({ name: '', creditCode: '', location: '', industry: '', contactName: '', contactPhone: '', password: '' })
+const companyRegForm = reactive({ name: '', creditCode: '', location: '', industry: '', contactName: '', contactPhone: '', email: '', password: '' })
 const companyRegRules = {
   name: [{ required: true, message: '请输入企业全称', trigger: 'blur' }],
   creditCode: [{ required: true, message: '请输入社会统一信用代码', trigger: 'blur' }],
@@ -235,6 +238,10 @@ const companyRegRules = {
   industry: [{ required: true, message: '请选择行业', trigger: 'change' }],
   contactName: [{ required: true, message: '请输入联系人姓名', trigger: 'blur' }],
   contactPhone: [{ required: true, message: '请输入联系人电话', trigger: 'blur' }],
+  email: [
+    { required: true, message: '请输入企业邮箱', trigger: 'blur' },
+    { pattern: /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/, message: '邮箱格式不正确', trigger: 'blur' }
+  ],
   password: [{ required: true, message: '请输入密码', trigger: 'blur' }]
 }
 

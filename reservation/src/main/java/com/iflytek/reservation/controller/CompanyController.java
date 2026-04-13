@@ -3,6 +3,7 @@ package com.iflytek.reservation.controller;
 import com.iflytek.reservation.common.AuthTokenUtil;
 import com.iflytek.reservation.common.IndustryUtil;
 import com.iflytek.reservation.common.Result;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.iflytek.reservation.entity.Company;
 import com.iflytek.reservation.service.CompanyService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -40,6 +41,15 @@ public class CompanyController {
         if (id == null) {
             return Result.error(401, "未登录");
         }
+        if (body.getEmail() == null || body.getEmail().isBlank()) {
+            return Result.error("请输入企业邮箱");
+        }
+        Company emailExisting = companyService.getOne(new LambdaQueryWrapper<Company>()
+                .eq(Company::getEmail, body.getEmail())
+                .ne(Company::getCompanyId, id), false);
+        if (emailExisting != null) {
+            return Result.error("邮箱已存在");
+        }
         String industry = IndustryUtil.normalize(body.getIndustry());
         if (industry == null) {
             return Result.error("所属行业不合法");
@@ -51,6 +61,7 @@ public class CompanyController {
         update.setIndustry(industry);
         update.setContactName(body.getContactName());
         update.setContactPhone(body.getContactPhone());
+        update.setEmail(body.getEmail());
         update.setAddress(body.getAddress());
         update.setStatus(0);
         update.setAuditRemark(null);
@@ -68,6 +79,7 @@ public class CompanyController {
         private String industry;
         private String contactName;
         private String contactPhone;
+        private String email;
         private String address;
 
         public String getCreditCode() {
@@ -108,6 +120,14 @@ public class CompanyController {
 
         public void setContactPhone(String contactPhone) {
             this.contactPhone = contactPhone;
+        }
+
+        public String getEmail() {
+            return email;
+        }
+
+        public void setEmail(String email) {
+            this.email = email;
         }
 
         public String getAddress() {

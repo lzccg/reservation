@@ -72,6 +72,7 @@ CREATE TABLE `company`  (
   `industry` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '企业所属行业',
   `contact_name` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '企业联系人姓名',
   `contact_phone` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '企业联系人电话',
+  `email` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '企业的电子邮箱',
   `password` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '登录密码',
   `address` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '企业详细地址',
   `status` tinyint NULL DEFAULT 0 COMMENT '账号/审核状态（0-待审，1-正常，2-驳回，3-已注销）',
@@ -80,16 +81,17 @@ CREATE TABLE `company`  (
   `update_time` datetime NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '企业信息最后修改时间',
   `audit_time` datetime NULL DEFAULT NULL COMMENT '账号审核通过的时间',
   PRIMARY KEY (`company_id`) USING BTREE,
-  UNIQUE INDEX `credit_code`(`credit_code`) USING BTREE
+  UNIQUE INDEX `credit_code`(`credit_code`) USING BTREE,
+  UNIQUE INDEX `email`(`email`) USING BTREE
 ) ENGINE = InnoDB AUTO_INCREMENT = 5 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '用于存储发布宣讲会的企业资质信息与审核状态 。' ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of company
 -- ----------------------------
-INSERT INTO `company` VALUES (1, '科大讯飞有限公司', 'kdxf123456', '安徽省芜湖市', '计算机/互联网', 'abb', '12345678901', '$2a$10$ODQzD.U1amT4zyVNRQPJeOCTwFMMIX81sKkyOgIkhiA0jei/jIwJ.', '安徽省芜湖市000001-1-1', 1, NULL, '2026-03-31 16:01:59', '2026-04-01 22:04:02', '2026-04-01 22:00:15');
-INSERT INTO `company` VALUES (2, '????', 'CREDIT001', '??', '计算机/互联网', '??', '13900000000', '$2a$10$DV6nA3q.kLlHwW30o7hQ8.dGczivnAQsLWlMRPBKfBuLv0qmZtiVm', NULL, 3, '111', '2026-03-31 16:36:30', '2026-04-01 22:04:05', NULL);
-INSERT INTO `company` VALUES (3, '上海墨水厂', 'shmsc000000123', '上海市嘉定区', '制造/工业', '尚墨水', '12300000000', '$2a$10$hXp23/5PPrh/RXt6enx1SeQDxve7yffEbY.yucuw4HOdfvd.E1pCi', '上海市嘉定区某路00001号', 1, NULL, '2026-04-01 22:28:17', '2026-04-02 17:56:04', '2026-04-02 17:56:04');
-INSERT INTO `company` VALUES (4, '东方树叶有限公司', 'dfsy', '浙江省杭州市', '其他', '李东方', 'dfsy', '$2a$10$HUReXPWx9cRiazRuR4gz1OzHkwTetUJbrx/9y4jtG0btwkUIuIsvC', '浙江省杭州市东方树叶1号', 0, NULL, '2026-04-02 17:57:27', '2026-04-02 17:57:46', NULL);
+INSERT INTO `company` VALUES (1, '科大讯飞有限公司', 'kdxf123456', '安徽省芜湖市', '计算机/互联网', 'abb', '12345678901', 'kdxf@example.com', '$2a$10$ODQzD.U1amT4zyVNRQPJeOCTwFMMIX81sKkyOgIkhiA0jei/jIwJ.', '安徽省芜湖市000001-1-1', 1, NULL, '2026-03-31 16:01:59', '2026-04-01 22:04:02', '2026-04-01 22:00:15');
+INSERT INTO `company` VALUES (2, '????', 'CREDIT001', '??', '计算机/互联网', '??', '13900000000', 'company2@example.com', '$2a$10$DV6nA3q.kLlHwW30o7hQ8.dGczivnAQsLWlMRPBKfBuLv0qmZtiVm', NULL, 3, '111', '2026-03-31 16:36:30', '2026-04-01 22:04:05', NULL);
+INSERT INTO `company` VALUES (3, '上海墨水厂', 'shmsc000000123', '上海市嘉定区', '制造/工业', '尚墨水', '12300000000', 'shmsc@example.com', '$2a$10$hXp23/5PPrh/RXt6enx1SeQDxve7yffEbY.yucuw4HOdfvd.E1pCi', '上海市嘉定区某路00001号', 1, NULL, '2026-04-01 22:28:17', '2026-04-02 17:56:04', '2026-04-02 17:56:04');
+INSERT INTO `company` VALUES (4, '东方树叶有限公司', 'dfsy', '浙江省杭州市', '其他', '李东方', 'dfsy', 'dfsy@example.com', '$2a$10$HUReXPWx9cRiazRuR4gz1OzHkwTetUJbrx/9y4jtG0btwkUIuIsvC', '浙江省杭州市东方树叶1号', 0, NULL, '2026-04-02 17:57:27', '2026-04-02 17:57:46', NULL);
 
 -- ----------------------------
 -- Table structure for face_data

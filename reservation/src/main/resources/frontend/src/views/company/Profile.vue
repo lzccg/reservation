@@ -40,6 +40,9 @@
         <el-form-item label="企业联系人电话" prop="contactPhone">
           <el-input v-model="companyForm.contactPhone" />
         </el-form-item>
+        <el-form-item label="企业电子邮箱" prop="email">
+          <el-input v-model="companyForm.email" placeholder="请输入企业电子邮箱" />
+        </el-form-item>
         <el-form-item label="企业详细地址" prop="address">
           <el-input v-model="companyForm.address" placeholder="请输入能精确到门牌号的详细地址" />
         </el-form-item>
@@ -96,6 +99,7 @@ const companyForm = reactive({
   industry: userInfo.value?.industry || '',
   contactName: userInfo.value?.contactName || '',
   contactPhone: userInfo.value?.contactPhone || '',
+  email: userInfo.value?.email || '',
   address: userInfo.value?.address || ''
 })
 
@@ -105,6 +109,10 @@ const companyRules = {
   industry: [{ required: true, message: '必填项', trigger: 'change' }],
   contactName: [{ required: true, message: '必填项', trigger: 'blur' }],
   contactPhone: [{ required: true, message: '必填项', trigger: 'blur' }],
+  email: [
+    { required: true, message: '必填项', trigger: 'blur' },
+    { pattern: /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$/, message: '邮箱格式不正确', trigger: 'blur' }
+  ],
   address: [{ required: true, message: '必填项', trigger: 'blur' }]
 }
 
@@ -116,6 +124,7 @@ const isComplete = computed(() => {
     && !isBlank(companyForm.industry)
     && !isBlank(companyForm.contactName)
     && !isBlank(companyForm.contactPhone)
+    && !isBlank(companyForm.email)
     && !isBlank(companyForm.address)
 })
 
@@ -160,6 +169,7 @@ const loadProfile = async () => {
   companyForm.industry = data.industry || ''
   companyForm.contactName = data.contactName || ''
   companyForm.contactPhone = data.contactPhone || ''
+  companyForm.email = data.email || ''
   companyForm.address = data.address || ''
   companyMeta.status = data.status ?? null
   companyMeta.updateTime = data.updateTime || null
@@ -188,6 +198,7 @@ const saveCompanyInfo = () => {
         industry: companyForm.industry,
         contactName: companyForm.contactName,
         contactPhone: companyForm.contactPhone,
+        email: companyForm.email,
         address: companyForm.address
       })
       await loadProfile()

@@ -17,6 +17,7 @@ public class Company {
     private String industry;
     private String contactName;
     private String contactPhone;
+    private String email;
     private String password;
     private String address;
     private Integer status;

@@ -6,5 +6,5 @@ import com.iflytek.reservation.entity.Company;
 public interface CompanyService extends IService<Company> {
     Company login(String username, String password);
     boolean register(Company company);
-    boolean changePassword(String contactPhone, String oldPassword, String newPassword);
+    boolean changePassword(String username, String oldPassword, String newPassword);
 }
