@@ -2,6 +2,7 @@ package com.iflytek.reservation.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
+import com.iflytek.reservation.common.AuthTokenUtil;
 import com.iflytek.reservation.common.Result;
 import com.iflytek.reservation.entity.Checkin;
 import com.iflytek.reservation.entity.Company;
@@ -36,6 +37,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.time.LocalDateTime;
+import java.time.LocalDate;
 
 @RestController
 @RequestMapping("/api/admin")
@@ -61,6 +63,51 @@ public class AdminController {
 
     @Autowired
     private CheckinMapper checkinMapper;
+
+    @GetMapping("/checkin/today-sessions")
+    public Result<?> todayCheckinSessions(HttpServletRequest request) {
+        Long adminId = AuthTokenUtil.extractId(request);
+        if (adminId == null) {
+            return Result.error(401, "未登录");
+        }
+
+        LocalDate today = LocalDate.now();
+        LocalDateTime start = today.atStartOfDay();
+        LocalDateTime end = today.plusDays(1).atStartOfDay();
+
+        QueryWrapper<Session> wrapper = new QueryWrapper<>();
+        wrapper.eq("session_status", 2);
+        wrapper.ge("start_time", start);
+        wrapper.lt("start_time", end);
+        wrapper.orderByAsc("start_time");
+        List<Session> sessions = sessionMapper.selectList(wrapper);
+
+        Set<Long> companyIds = sessions.stream()
+                .map(Session::getCompanyId)
+                .filter(id -> id != null)
+                .collect(Collectors.toSet());
+        Map<Long, Company> companyMap = new HashMap<>();
+        if (!companyIds.isEmpty()) {
+            List<Company> companies = companyService.listByIds(companyIds);
+            companyMap = companies.stream()
+                    .filter(c -> c != null && c.getCompanyId() != null)
+                    .collect(Collectors.toMap(Company::getCompanyId, c -> c));
+        }
+
+        List<Map<String, Object>> list = new ArrayList<>();
+        for (Session s : sessions) {
+            Company c = s.getCompanyId() == null ? null : companyMap.get(s.getCompanyId());
+            Map<String, Object> row = new HashMap<>();
+            row.put("sessionId", s.getSessionId());
+            row.put("startTime", s.getStartTime());
+            row.put("endTime", s.getEndTime());
+            row.put("companyName", c == null ? "-" : c.getCompanyName());
+            row.put("sessionTitle", s.getSessionTitle());
+            row.put("sessionLocation", s.getSessionLocation());
+            list.add(row);
+        }
+        return Result.success(list);
+    }
 
     @GetMapping("/companies")
     public Result<?> listCompanies(

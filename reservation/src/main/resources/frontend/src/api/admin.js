@@ -47,3 +47,7 @@ export const getSessionDetail = (id) => {
 export const auditSession = (id, action, data) => {
   return request({ url: `/admin/session/${id}/audit`, method: 'post', data: { action, ...data } })
 }
+
+export const getTodayCheckinSessions = () => {
+  return request({ url: '/admin/checkin/today-sessions', method: 'get' })
+}
