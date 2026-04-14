@@ -78,8 +78,7 @@ const fetchData = async () => {
 }
 
 const handleOpenKiosk = (row) => {
-  const routeUrl = router.resolve({ path: '/kiosk/checkin', query: { sessionId: row.sessionId } })
-  window.open(routeUrl.href, '_blank')
+  router.push({ path: '/kiosk/checkin', query: { sessionId: row.sessionId } })
 }
 
 onMounted(() => {

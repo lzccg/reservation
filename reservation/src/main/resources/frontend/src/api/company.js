@@ -35,3 +35,11 @@ export const cancelSession = (id, cancelReason) => {
 export const getCheckinRecords = (params) => {
   return request({ url: '/company/checkin-records', method: 'get', params })
 }
+
+export const getCompanyDashboardSummary = () => {
+  return request({ url: '/company/dashboard/summary', method: 'get' })
+}
+
+export const getCompanyCollegeDistribution = () => {
+  return request({ url: '/company/dashboard/college-distribution', method: 'get' })
+}

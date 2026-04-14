@@ -18,3 +18,7 @@ export const uploadFaceInfo = (file) => {
 export const verifyFaceCheckin = (sessionId, base64Str) => {
   return request({ url: `/checkin/verify/${sessionId}`, method: 'post', data: { image: base64Str } })
 }
+
+export const getCheckinSessionInfo = (sessionId) => {
+  return request({ url: `/checkin/session-info/${sessionId}`, method: 'get' })
+}

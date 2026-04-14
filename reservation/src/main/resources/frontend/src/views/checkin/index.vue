@@ -42,18 +42,33 @@
       <el-col :span="10">
         <el-card shadow="hover" class="app-card status-card">
           <div class="status-panel">
-            <h3 class="session-name">腾讯2025校园招聘宣讲会</h3>
+            <h3 class="session-name">{{ sessionInfo ? sessionInfo.sessionTitle : '宣讲会信息' }}</h3>
+
+            <div v-if="sessionInfo" class="session-meta">
+              <div class="meta-item">
+                <el-icon><OfficeBuilding /></el-icon>
+                <span>承办企业：{{ sessionInfo.companyName }}</span>
+              </div>
+              <div class="meta-item">
+                <el-icon><Clock /></el-icon>
+                <span>活动时间：{{ formatTimeRange(sessionInfo.startTime, sessionInfo.endTime) }}</span>
+              </div>
+              <div class="meta-item">
+                <el-icon><Location /></el-icon>
+                <span>举办场地：{{ sessionInfo.sessionLocation }}</span>
+              </div>
+            </div>
             
             <div class="verify-status">
               <div v-if="!scanning && !checkinSuccess" class="status-wait">
                 <el-icon size="80" color="#909399"><Camera /></el-icon>
-                <p>请看向摄像头进行人脸1:1比对签到</p>
-                <p class="sub-text">通过在系统中录入的面部数据验证身份</p>
+                <p>请看向摄像头进行人脸 1:N 搜索签到</p>
+                <p class="sub-text">系统会在 reservation_face_date 人脸库中检索并完成签到写入</p>
               </div>
 
               <div v-else-if="scanning && !checkinSuccess" class="status-scanning">
                 <el-icon size="80" class="is-loading" color="#409EFF"><Loading /></el-icon>
-                <p>正在比对人脸特征...</p>
+                <p>正在检索人脸...</p>
                 <p class="sub-text">请保持面部在取景框内</p>
               </div>
 
@@ -61,10 +76,6 @@
                 <el-icon size="80" color="#67C23A"><CircleCheckFilled /></el-icon>
                 <p class="success-text">签到成功！</p>
                 <p class="sub-text">身份验证通过，欢迎参加宣讲会</p>
-                
-                <el-button type="primary" @click="router.push('/student/history')" style="margin-top: 20px">
-                  查看我的签到记录
-                </el-button>
               </div>
             </div>
           </div>
@@ -81,6 +92,7 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { getCheckinSessionInfo, verifyFaceCheckin } from '@/api/checkin'
 
 const router = useRouter()
 const route = useRoute()
@@ -91,7 +103,29 @@ const mediaStream = ref(null)
 
 const scanning = ref(false)
 const checkinSuccess = ref(false)
+const sessionId = ref(null)
+const sessionInfo = ref(null)
 let scanInterval = null
+
+const normalizeDateTime = (v) => {
+  if (!v) return ''
+  const s = String(v)
+  return s.includes('T') ? s.replace('T', ' ') : s
+}
+
+const formatTimeRange = (start, end) => {
+  const s = normalizeDateTime(start)
+  const e = normalizeDateTime(end)
+  if (!s || !e) return '-'
+  const date = s.slice(0, 10)
+  const st = s.slice(11, 16)
+  const ed = e.slice(0, 10)
+  const et = e.slice(11, 16)
+  if (date && date === ed) {
+    return `${date} ${st} - ${et}`
+  }
+  return `${s.slice(0, 16)} - ${e.slice(0, 16)}`
+}
 
 const startCamera = async () => {
   checkinSuccess.value = false
@@ -123,18 +157,31 @@ const stopCamera = () => {
 }
 
 const startScanLoop = () => {
-  // 模拟每3秒向服务器发送一次人脸比对请求
-  let attempts = 0
-  scanInterval = setInterval(() => {
-    attempts++
-    captureAndValidate()
-    
-    // 模拟第二次尝试时比对成功
-    if (attempts === 2) {
-      checkinSuccess.value = true
-      scanning.value = false
-      clearInterval(scanInterval)
-      ElMessage.success('1:1 人脸验证成功，签到完成')
+  if (!sessionId.value) {
+    scanning.value = false
+    return
+  }
+  scanInterval = setInterval(async () => {
+    if (checkinSuccess.value) {
+      return
+    }
+    const base64Img = captureAndValidate()
+    if (!base64Img) {
+      return
+    }
+    try {
+      const data = await verifyFaceCheckin(sessionId.value, base64Img)
+      if (data && data.success) {
+        checkinSuccess.value = true
+        scanning.value = false
+        clearInterval(scanInterval)
+        ElMessage.success(data.checkinStatus === 1 ? '迟到签到成功' : '签到成功')
+      } else if (data && data.message) {
+        scanning.value = false
+        clearInterval(scanInterval)
+        ElMessage.error(data.message)
+      }
+    } catch (e) {
     }
   }, 2000)
 }
@@ -147,16 +194,21 @@ const captureAndValidate = () => {
   canvas.height = video.videoHeight
   const ctx = canvas.getContext('2d')
   ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
-  // const base64Img = canvas.toDataURL('image/jpeg', 0.8)
-  // 实际应用中：axios.post('/api/face/compare', { image: base64Img })
+  return canvas.toDataURL('image/jpeg', 0.8)
 }
 
 onMounted(() => {
-  // 根据分享的路由 Query 获取对应宣讲会信息
-  const sessionId = route.query.sessionId
-  if (sessionId) {
-    console.log('Kiosk initialized for session:', sessionId)
+  const sid = route.query.sessionId
+  sessionId.value = sid ? String(sid) : null
+  if (!sessionId.value) {
+    ElMessage.error('缺少 sessionId')
+    return
   }
+  getCheckinSessionInfo(sessionId.value).then((data) => {
+    sessionInfo.value = data || null
+  }).catch(() => {
+    sessionInfo.value = null
+  })
 })
 
 onUnmounted(() => {
@@ -169,6 +221,24 @@ onUnmounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.session-meta {
+  margin: 12px 0 8px;
+}
+
+.meta-item {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+  color: #606266;
+  font-size: 14px;
+}
+
+.meta-item .el-icon {
+  margin-right: 8px;
+  font-size: 16px;
+  color: #409EFF;
 }
 
 .video-container {

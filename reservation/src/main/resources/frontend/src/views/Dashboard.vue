@@ -1,5 +1,5 @@
 <template>
-  <div class="dashboard-container">
+  <div class="page-container">
     <!-- 管理员 Dashboard -->
     <template v-if="role === 'admin'">
       <el-row :gutter="20">
@@ -19,16 +19,16 @@
       </el-row>
 
       <el-row :gutter="20" style="margin-top: 20px;">
-        <el-col :span="16">
+        <el-col :span="12">
+          <el-card shadow="hover" class="app-card">
+            <template #header><div class="card-header">一周宣讲会预约趋势</div></template>
+            <div ref="adminReserveChartRef" style="height: 350px; width: 100%;"></div>
+          </el-card>
+        </el-col>
+        <el-col :span="12">
           <el-card shadow="hover" class="app-card">
             <template #header><div class="card-header">一周宣讲会签到趋势</div></template>
             <div ref="adminMainChartRef" style="height: 350px; width: 100%;"></div>
-          </el-card>
-        </el-col>
-        <el-col :span="8">
-          <el-card shadow="hover" class="app-card">
-            <template #header><div class="card-header">各学院预约分布</div></template>
-            <div ref="adminPieChartRef" style="height: 350px; width: 100%;"></div>
           </el-card>
         </el-col>
       </el-row>
@@ -83,7 +83,7 @@
       <el-row :gutter="20" style="margin-top: 20px;">
         <el-col :span="16">
           <el-card shadow="hover" class="app-card">
-            <template #header><div class="card-header">岗位意向预约分析</div></template>
+            <template #header><div class="card-header">学院预约分布</div></template>
             <div ref="companyChartRef" style="height: 350px; width: 100%;"></div>
           </el-card>
         </el-col>
@@ -91,10 +91,21 @@
           <el-card shadow="hover" class="app-card">
             <template #header><div class="card-header">最新宣讲动态</div></template>
             <div class="latest-session-box">
-              <h3>腾讯2025校园招聘宣讲会</h3>
-              <p>状态：<el-tag type="success">已发布</el-tag></p>
-              <p>时间：2025-04-10 14:00</p>
-              <p>容量：800 / 已预约：650</p>
+              <h3>{{ latestCompanySession ? latestCompanySession.sessionTitle : '-' }}</h3>
+              <p>
+                状态：
+                <el-tag :type="latestCompanySession ? mapSessionStatusType(latestCompanySession.sessionStatus) : 'info'">
+                  {{ latestCompanySession ? latestCompanySession.statusText : '-' }}
+                </el-tag>
+              </p>
+              <p>时间：{{ latestCompanySession ? formatDateTime(latestCompanySession.startTime) : '-' }}</p>
+              <p>
+                容量：
+                <span v-if="latestCompanySession">
+                  已预约 {{ latestCompanySession.reservedCount }} / 总容量 {{ latestCompanySession.capacity }}
+                </span>
+                <span v-else>-</span>
+              </p>
             </div>
             
             <div style="margin-top: 20px; color: #606266; font-size: 14px;">
@@ -115,95 +126,185 @@
 import { ref, onMounted, computed, nextTick, onUnmounted } from 'vue'
 import { useUserStore } from '@/store/user'
 import * as echarts from 'echarts'
+import { getAdminCheckinTrend, getAdminDashboardSummary, getAdminReservationTrend } from '@/api/admin'
+import { getCompanyCollegeDistribution, getCompanyDashboardSummary } from '@/api/company'
+import { getStudentDashboardSummary, getStudentIndustryDistribution } from '@/api/student'
 
 const userStore = useUserStore()
 const role = computed(() => userStore.role)
 
 // 管理员数据
-const adminStatCards = [
-  { title: '总注册人数', value: '12,500', icon: 'User', color: '#409EFF' },
-  { title: '入驻企业数', value: '350', icon: 'OfficeBuilding', color: '#67C23A' },
-  { title: '今日宣讲会', value: '12', icon: 'Calendar', color: '#E6A23C' },
-  { title: '总签到人次', value: '45,210', icon: 'Histogram', color: '#F56C6C' }
-]
+const adminStatCards = ref([
+  { title: '总注册人数', value: '-', icon: 'User', color: '#409EFF' },
+  { title: '入驻企业数', value: '-', icon: 'OfficeBuilding', color: '#67C23A' },
+  { title: '今日宣讲会', value: '-', icon: 'Calendar', color: '#E6A23C' },
+  { title: '总签到人次', value: '-', icon: 'Histogram', color: '#F56C6C' }
+])
 
 // 学生数据
-const studentStatCards = [
-  { title: '已参加宣讲', value: '15', icon: 'DataBoard', color: '#409EFF' },
-  { title: '即将参加', value: '2', icon: 'Timer', color: '#E6A23C' },
-  { title: '近期开放场次', value: '45', icon: 'Ticket', color: '#67C23A' }
-]
+const studentStatCards = ref([
+  { title: '已参加宣讲', value: '-', icon: 'DataBoard', color: '#409EFF' },
+  { title: '即将参加', value: '-', icon: 'Timer', color: '#E6A23C' },
+  { title: '近期开放场次', value: '-', icon: 'Ticket', color: '#67C23A' }
+])
 
 // 企业数据
-const companyStatCards = [
-  { title: '举办宣讲会总数', value: '18', icon: 'Position', color: '#409EFF' },
-  { title: '累积关注预约人数', value: '4,520', icon: 'Star', color: '#F56C6C' },
-  { title: '整体到场率', value: '89%', icon: 'DataLine', color: '#67C23A' }
-]
+const companyStatCards = ref([
+  { title: '举办宣讲会总数', value: '-', icon: 'Position', color: '#409EFF' },
+  { title: '累积关注预约人数', value: '-', icon: 'Star', color: '#F56C6C' },
+  { title: '整体到场率', value: '-', icon: 'DataLine', color: '#67C23A' }
+])
 
 const adminMainChartRef = ref(null)
-const adminPieChartRef = ref(null)
+const adminReserveChartRef = ref(null)
 const studentChartRef = ref(null)
 const companyChartRef = ref(null)
 
-let adminMainChart, adminPieChart, studentChart, companyChart = null
+let adminMainChart, adminReserveChart, studentChart, companyChart = null
+const latestCompanySession = ref(null)
+
+const fetchAdminDashboard = async () => {
+  try {
+    const [summary, checkinTrend, reservationTrend] = await Promise.all([
+      getAdminDashboardSummary(),
+      getAdminCheckinTrend(),
+      getAdminReservationTrend()
+    ])
+    adminStatCards.value = [
+      { title: '总注册人数', value: String(summary?.studentTotal ?? 0), icon: 'User', color: '#409EFF' },
+      { title: '入驻企业数', value: String(summary?.companyTotal ?? 0), icon: 'OfficeBuilding', color: '#67C23A' },
+      { title: '今日宣讲会', value: String(summary?.todaySessions ?? 0), icon: 'Calendar', color: '#E6A23C' },
+      { title: '总签到人次', value: String(summary?.checkinTotal ?? 0), icon: 'Histogram', color: '#F56C6C' }
+    ]
+    if (adminMainChart && checkinTrend) {
+      adminMainChart.setOption({
+        xAxis: { type: 'category', data: checkinTrend.days || [] },
+        series: [{ data: checkinTrend.values || [], type: 'line', smooth: true, areaStyle: { opacity: 0.1 } }]
+      })
+    }
+    if (adminReserveChart && reservationTrend) {
+      adminReserveChart.setOption({
+        xAxis: { type: 'category', data: reservationTrend.days || [] },
+        series: [{ data: reservationTrend.values || [], type: 'line', smooth: true, areaStyle: { opacity: 0.1 } }]
+      })
+    }
+  } catch (e) {
+    console.error(e)
+  }
+}
 
 const initCharts = () => {
-  if (role.value === 'admin' && adminMainChartRef.value) {
+  if (role.value === 'admin' && adminMainChartRef.value && adminReserveChartRef.value) {
     adminMainChart = echarts.init(adminMainChartRef.value)
     adminMainChart.setOption({
       tooltip: { trigger: 'axis' },
-      xAxis: { type: 'category', data: ['周一', '周二', '周三', '周四', '周五', '周六', '周日'] },
+      xAxis: { type: 'category', data: [] },
       yAxis: { type: 'value' },
-      series: [{ data: [150, 230, 224, 218, 135, 147, 260], type: 'line', smooth: true, areaStyle: { opacity: 0.1 } }]
+      series: [{ data: [], type: 'line', smooth: true, areaStyle: { opacity: 0.1 } }]
     })
-    
-    adminPieChart = echarts.init(adminPieChartRef.value)
-    adminPieChart.setOption({
-      tooltip: { trigger: 'item' },
-      legend: { bottom: '0%', left: 'center' },
-      series: [{
-        name: '人数分布', type: 'pie', radius: ['40%', '70%'],
-        itemStyle: { borderRadius: 10, borderColor: '#fff', borderWidth: 2 },
-        label: { show: false, position: 'center' },
-        data: [
-          { value: 1048, name: '计软学院' }, { value: 735, name: '通信学院' },
-          { value: 580, name: '经管学院' }, { value: 484, name: '机械学院' }
-        ]
-      }]
+    adminReserveChart = echarts.init(adminReserveChartRef.value)
+    adminReserveChart.setOption({
+      tooltip: { trigger: 'axis' },
+      xAxis: { type: 'category', data: [] },
+      yAxis: { type: 'value' },
+      series: [{ data: [], type: 'line', smooth: true, areaStyle: { opacity: 0.1 } }]
     })
   } else if (role.value === 'student' && studentChartRef.value) {
     studentChart = echarts.init(studentChartRef.value)
     studentChart.setOption({
       tooltip: { trigger: 'axis' },
-      xAxis: { type: 'category', data: ['互联网/IT', '金融服务', '新能源制造', '医疗教育', '房地产'] },
+      xAxis: { type: 'category', data: [] },
       yAxis: { type: 'value' },
       series: [{
         name: '本校预约热度',
         type: 'bar',
-        data: [820, 450, 560, 300, 150],
+        data: [],
         itemStyle: { color: '#66b1ff', borderRadius: [4, 4, 0, 0] }
       }]
     })
   } else if (role.value === 'company' && companyChartRef.value) {
     companyChart = echarts.init(companyChartRef.value)
     companyChart.setOption({
-      tooltip: { trigger: 'axis' },
-      xAxis: { type: 'category', data: ['软件', '测试', '产品', '运营', '市场'] },
-      yAxis: { type: 'value' },
+      tooltip: { trigger: 'item' },
+      legend: { bottom: '0%', left: 'center' },
       series: [{
-        name: '预约意向人数',
-        type: 'bar',
-        data: [320, 150, 100, 80, 50],
-        itemStyle: { color: '#67c23a', borderRadius: [4, 4, 0, 0] }
+        name: '预约人数',
+        type: 'pie',
+        radius: ['45%', '70%'],
+        itemStyle: { borderRadius: 10, borderColor: '#fff', borderWidth: 2 },
+        label: { show: true, formatter: '{b}: {c}' },
+        data: []
       }]
     })
   }
 }
 
+const formatDateTime = (v) => {
+  if (!v) return ''
+  const s = String(v)
+  const x = s.includes('T') ? s.replace('T', ' ') : s
+  return x.length >= 16 ? x.slice(0, 16) : x
+}
+
+const mapSessionStatusType = (status) => {
+  if (status === 2) return 'success'
+  if (status === 3) return 'info'
+  if (status === 4 || status === 5) return 'danger'
+  if (status === 0) return 'warning'
+  return 'info'
+}
+
+const fetchCompanyDashboard = async () => {
+  try {
+    const [summary, dist] = await Promise.all([
+      getCompanyDashboardSummary(),
+      getCompanyCollegeDistribution()
+    ])
+    companyStatCards.value = [
+      { title: '举办宣讲会总数', value: String(summary?.sessionTotal ?? 0), icon: 'Position', color: '#409EFF' },
+      { title: '累积关注预约人数', value: String(summary?.reservationTotal ?? 0), icon: 'Star', color: '#F56C6C' },
+      { title: '整体到场率', value: String(summary?.attendanceRate ?? 0) + '%', icon: 'DataLine', color: '#67C23A' }
+    ]
+    latestCompanySession.value = summary?.latestSession || null
+    if (companyChart && dist) {
+      companyChart.setOption({
+        series: [{
+          data: (dist || []).map((d) => ({ name: d.college, value: Number(d.count || 0) }))
+        }]
+      })
+    }
+  } catch (e) {
+    console.error(e)
+  }
+}
+
+const fetchStudentDashboard = async () => {
+  try {
+    const [summary, dist] = await Promise.all([
+      getStudentDashboardSummary(),
+      getStudentIndustryDistribution()
+    ])
+    studentStatCards.value = [
+      { title: '已参加宣讲', value: String(summary?.attended ?? 0), icon: 'DataBoard', color: '#409EFF' },
+      { title: '即将参加', value: String(summary?.upcoming ?? 0), icon: 'Timer', color: '#E6A23C' },
+      { title: '近期开放场次', value: String(summary?.openSessions ?? 0), icon: 'Ticket', color: '#67C23A' }
+    ]
+    if (studentChart && dist) {
+      const x = (dist || []).map((d) => d.industry)
+      const y = (dist || []).map((d) => Number(d.count || 0))
+      studentChart.setOption({
+        xAxis: { type: 'category', data: x },
+        series: [{ data: y, type: 'bar' }]
+      })
+    }
+  } catch (e) {
+    console.error(e)
+  }
+}
+
 const resizeHandler = () => {
   adminMainChart?.resize()
-  adminPieChart?.resize()
+  adminReserveChart?.resize()
   studentChart?.resize()
   companyChart?.resize()
 }
@@ -211,6 +312,13 @@ const resizeHandler = () => {
 onMounted(() => {
   nextTick(() => {
     initCharts()
+    if (role.value === 'admin') {
+      fetchAdminDashboard()
+    } else if (role.value === 'student') {
+      fetchStudentDashboard()
+    } else if (role.value === 'company') {
+      fetchCompanyDashboard()
+    }
     window.addEventListener('resize', resizeHandler)
   })
 })
@@ -218,16 +326,13 @@ onMounted(() => {
 onUnmounted(() => {
   window.removeEventListener('resize', resizeHandler)
   adminMainChart?.dispose()
-  adminPieChart?.dispose()
+  adminReserveChart?.dispose()
   studentChart?.dispose()
   companyChart?.dispose()
 })
 </script>
 
 <style scoped>
-.dashboard-container {
-  padding-bottom: 20px;
-}
 .stat-card { border-radius: 8px; border: none; }
 .stat-body { display: flex; align-items: center; }
 .stat-icon-wrapper { width: 56px; height: 56px; border-radius: 12px; display: flex; justify-content: center; align-items: center; margin-right: 16px; }

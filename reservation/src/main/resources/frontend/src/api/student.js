@@ -31,3 +31,11 @@ export const getReserveHistory = (params) => {
 export const cancelReservation = (reservationId) => {
   return request({ url: '/student/reservation/cancel', method: 'post', params: { reservationId } })
 }
+
+export const getStudentDashboardSummary = () => {
+  return request({ url: '/student/dashboard/summary', method: 'get' })
+}
+
+export const getStudentIndustryDistribution = () => {
+  return request({ url: '/student/dashboard/industry-distribution', method: 'get' })
+}

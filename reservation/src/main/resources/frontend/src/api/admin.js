@@ -51,3 +51,35 @@ export const auditSession = (id, action, data) => {
 export const getTodayCheckinSessions = () => {
   return request({ url: '/admin/checkin/today-sessions', method: 'get' })
 }
+
+export const getStatisticsSummary = (params) => {
+  return request({ url: '/admin/statistics/summary', method: 'get', params })
+}
+
+export const getStatisticsSessions = (params) => {
+  return request({ url: '/admin/statistics/sessions', method: 'get', params })
+}
+
+export const getStatisticsSessionDetail = (params) => {
+  return request({ url: '/admin/statistics/session-detail', method: 'get', params })
+}
+
+export const getStatisticsCompanies = (params) => {
+  return request({ url: '/admin/statistics/companies', method: 'get', params })
+}
+
+export const getStatisticsCompanySessions = (params) => {
+  return request({ url: '/admin/statistics/company-sessions', method: 'get', params })
+}
+
+export const getAdminDashboardSummary = () => {
+  return request({ url: '/admin/dashboard/summary', method: 'get' })
+}
+
+export const getAdminCheckinTrend = () => {
+  return request({ url: '/admin/dashboard/checkin-trend', method: 'get' })
+}
+
+export const getAdminReservationTrend = () => {
+  return request({ url: '/admin/dashboard/reservation-trend', method: 'get' })
+}
