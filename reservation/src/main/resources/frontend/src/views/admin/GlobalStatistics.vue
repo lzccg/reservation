@@ -7,7 +7,7 @@
 
     <el-card shadow="hover" class="app-card">
       <!-- 搜索筛选 -->
-      <el-form :inline="true" class="search-form">
+      <el-form :inline="!isMobile" class="search-form">
         <el-form-item label="日期范围">
           <el-date-picker
             v-model="dateRange"
@@ -19,7 +19,7 @@
           />
         </el-form-item>
         <el-form-item label="企业">
-          <el-select v-model="companyId" placeholder="全部" clearable style="width: 220px">
+          <el-select v-model="companyId" placeholder="全部" clearable class="company-select">
             <el-option v-for="c in companyOptions" :key="c.companyId" :label="c.companyName" :value="c.companyId" />
           </el-select>
         </el-form-item>
@@ -31,25 +31,25 @@
 
       <!-- 统计数据汇总卡片 -->
       <el-row :gutter="20" style="margin-bottom: 20px;">
-        <el-col :span="6">
+        <el-col :xs="24" :sm="12" :lg="6">
           <div class="statistic-item bg-blue">
             <div class="stat-name">宣讲会总场次</div>
             <div class="stat-num">{{ summary.sessionTotal }}</div>
           </div>
         </el-col>
-        <el-col :span="6">
+        <el-col :xs="24" :sm="12" :lg="6">
           <div class="statistic-item bg-green">
             <div class="stat-name">总预约人次</div>
             <div class="stat-num">{{ summary.reservationTotal }}</div>
           </div>
         </el-col>
-        <el-col :span="6">
+        <el-col :xs="24" :sm="12" :lg="6">
           <div class="statistic-item bg-orange">
             <div class="stat-name">实际签到人次</div>
             <div class="stat-num">{{ summary.checkinTotal }}</div>
           </div>
         </el-col>
-        <el-col :span="6">
+        <el-col :xs="24" :sm="12" :lg="6">
           <div class="statistic-item bg-red">
             <div class="stat-name">整体签到率</div>
             <div class="stat-num">{{ summary.checkinRate }}%</div>
@@ -58,36 +58,38 @@
       </el-row>
 
       <!-- 详细统计列表 -->
-      <el-table
-        v-loading="loading"
-        :data="tableData"
-        border
-        stripe
-        style="width: 100%"
-        header-cell-class-name="table-header"
-      >
-        <el-table-column prop="companyName" label="企业名称" />
-        <el-table-column prop="sessionTitle" label="宣讲会" min-width="180" show-overflow-tooltip/>
-        <el-table-column prop="date" label="举办日期" width="120" />
-        <el-table-column prop="reserveCount" label="预约人数" width="100" align="center" />
-        <el-table-column prop="checkinCount" label="签到人数" width="100" align="center" />
-        <el-table-column label="本场签到率" width="120" align="center">
-          <template #default="{ row }">
-            <span :style="{ color: row.rate >= 90 ? '#67c23a' : row.rate < 60 ? '#f56c6c' : '#303133' }">
-              {{ row.rate }}%
-            </span>
-          </template>
-        </el-table-column>
-        <el-table-column label="详情" width="100" align="center">
-          <template #default="{ row }">
-            <el-button size="small" type="primary" link @click="handleViewDetails(row)">签到明细</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
+      <div class="table-wrap">
+        <el-table
+          v-loading="loading"
+          :data="tableData"
+          border
+          stripe
+          style="width: 100%"
+          header-cell-class-name="table-header"
+        >
+          <el-table-column prop="companyName" label="企业名称" />
+          <el-table-column prop="sessionTitle" label="宣讲会" min-width="180" show-overflow-tooltip/>
+          <el-table-column prop="date" label="举办日期" width="120" />
+          <el-table-column prop="reserveCount" label="预约人数" width="100" align="center" />
+          <el-table-column prop="checkinCount" label="签到人数" width="100" align="center" />
+          <el-table-column label="本场签到率" width="120" align="center">
+            <template #default="{ row }">
+              <span :style="{ color: row.rate >= 90 ? '#67c23a' : row.rate < 60 ? '#f56c6c' : '#303133' }">
+                {{ row.rate }}%
+              </span>
+            </template>
+          </el-table-column>
+          <el-table-column label="详情" width="100" align="center">
+            <template #default="{ row }">
+              <el-button size="small" type="primary" link @click="handleViewDetails(row)">签到明细</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
     </el-card>
 
     <!-- 签到明细弹窗 -->
-    <el-dialog :title="detailTitle" v-model="detailVisible" width="920px" destroy-on-close>
+    <el-dialog :title="detailTitle" v-model="detailVisible" :width="detailDialogWidth" destroy-on-close>
       <div class="detail-toolbar">
         <el-radio-group v-model="detailFilterStatus" size="small" @change="handleDetailFilterChange">
           <el-radio-button label="all">全部名单</el-radio-button>
@@ -126,7 +128,7 @@
       </div>
     </el-dialog>
 
-    <el-dialog title="导出Excel报表" v-model="exportVisible" width="520px" destroy-on-close>
+    <el-dialog title="导出Excel报表" v-model="exportVisible" :width="exportDialogWidth" destroy-on-close>
       <el-form :model="exportForm" label-width="90px">
         <el-form-item label="企业">
           <el-select v-model="exportForm.companyId" placeholder="请选择企业" style="width: 100%" @change="handleExportCompanyChange">
@@ -150,7 +152,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import axios from 'axios'
 import { useUserStore } from '@/store/user'
@@ -163,6 +165,9 @@ import {
 } from '@/api/admin'
 
 const loading = ref(false)
+const isMobile = ref(false)
+const detailDialogWidth = ref('920px')
+const exportDialogWidth = ref('520px')
 const dateRange = ref([])
 const companyId = ref(null)
 const companyOptions = ref([])
@@ -394,14 +399,36 @@ const confirmExport = async () => {
   }
 }
 
+const applyResponsive = () => {
+  const w = window.innerWidth || 1200
+  isMobile.value = w < 768
+  detailDialogWidth.value = isMobile.value ? '96%' : '920px'
+  exportDialogWidth.value = isMobile.value ? '96%' : '520px'
+}
+
 onMounted(() => {
+  applyResponsive()
+  window.addEventListener('resize', applyResponsive)
   fetchData()
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', applyResponsive)
 })
 </script>
 
 <style scoped>
 .search-form {
   margin-bottom: 20px;
+}
+
+.company-select {
+  width: 220px;
+}
+
+.table-wrap {
+  width: 100%;
+  overflow-x: auto;
 }
 
 .statistic-item {
@@ -443,5 +470,46 @@ onMounted(() => {
 :deep(.table-header) {
   background-color: #f5f7fa !important;
   color: #606266;
+}
+
+@media (max-width: 767px) {
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .search-form :deep(.el-form-item) {
+    width: 100%;
+    margin-right: 0;
+  }
+
+  .search-form :deep(.el-form-item__content) {
+    width: 100%;
+  }
+
+  .search-form :deep(.el-date-editor),
+  .search-form :deep(.el-select),
+  .search-form :deep(.el-input) {
+    width: 100% !important;
+  }
+
+  .company-select {
+    width: 100%;
+  }
+
+  .statistic-item {
+    margin-bottom: 10px;
+  }
+
+  .stat-num {
+    font-size: 24px;
+  }
+
+  .detail-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
 }
 </style>

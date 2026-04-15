@@ -66,8 +66,13 @@ public class CompanyDashboardController {
         double attendanceRate = reservationTotal <= 0 ? 0.0 : (checkinTotal * 100.0) / reservationTotal;
 
         Map<String, Object> latest = null;
-        if (!sessions.isEmpty()) {
-            Session s = sessions.get(0);
+        Session s = sessionMapper.selectOne(new QueryWrapper<Session>()
+                .eq("company_id", companyId)
+                .eq("session_status", 2)
+                .select("session_id", "session_title", "session_status", "start_time", "capacity", "remaining_seats")
+                .orderByDesc("start_time")
+                .last("limit 1"));
+        if (s != null) {
             long reservedCount = s.getCapacity() != null && s.getRemainingSeats() != null
                     ? Math.max(0L, (long) s.getCapacity() - (long) s.getRemainingSeats())
                     : reservationMapper.selectCount(new QueryWrapper<Reservation>()

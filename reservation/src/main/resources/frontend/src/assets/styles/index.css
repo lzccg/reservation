@@ -53,3 +53,123 @@ html, body, #app {
   display: flex;
   justify-content: flex-end;
 }
+
+/* 移动端全局自适应（不改变功能，仅调整布局密度与可读性） */
+@media (max-width: 767px) {
+  .el-row {
+    flex-wrap: wrap;
+  }
+
+  .el-row > .el-col {
+    flex: 0 0 100% !important;
+    max-width: 100% !important;
+  }
+
+  .page-container {
+    padding: 12px;
+    min-height: calc(100vh - 56px);
+  }
+
+  .page-header {
+    margin-bottom: 14px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .page-title {
+    font-size: 18px;
+  }
+
+  .app-card {
+    padding: 12px;
+    border-radius: 6px;
+    overflow-x: auto;
+  }
+
+  .pagination-container {
+    justify-content: center;
+  }
+
+  .search-form {
+    width: 100%;
+  }
+
+  .search-form .el-form-item {
+    width: 100%;
+    margin-right: 0;
+    margin-bottom: 10px;
+  }
+
+  .search-form .el-form-item__content {
+    width: 100%;
+  }
+
+  .search-form .el-input,
+  .search-form .el-select,
+  .search-form .el-date-editor,
+  .search-form .el-cascader {
+    width: 100% !important;
+  }
+
+  .search-form .el-button + .el-button {
+    margin-left: 8px !important;
+  }
+
+  .el-table {
+    min-width: 680px;
+  }
+
+  .el-dialog {
+    width: 96% !important;
+    margin-top: 6vh !important;
+  }
+
+  .el-dialog__body {
+    max-height: 70vh;
+    overflow: auto;
+  }
+
+  .el-dialog__footer {
+    padding-top: 10px;
+  }
+
+  .el-message-box {
+    width: 96% !important;
+  }
+
+  .el-drawer {
+    width: 96% !important;
+  }
+
+  .el-pagination {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px;
+  }
+
+  .el-descriptions {
+    overflow-x: auto;
+  }
+
+  .el-descriptions__table {
+    min-width: 420px;
+  }
+
+  .el-tag {
+    max-width: 100%;
+  }
+
+  img,
+  video,
+  canvas {
+    max-width: 100%;
+    height: auto;
+  }
+
+
+  .el-descriptions__label,
+  .el-descriptions__content {
+    font-size: 12px;
+  }
+}

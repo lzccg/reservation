@@ -1,6 +1,6 @@
 <template>
   <el-container class="layout-container">
-    <el-aside :width="isCollapse ? '64px' : '220px'" class="app-sidebar">
+    <el-aside :width="asideWidth" class="app-sidebar">
       <div class="logo">
         <span v-if="!isCollapse">宣讲会系统</span>
         <span v-else>预约</span>
@@ -157,7 +157,7 @@
 </template>
 
 <script setup>
-import { ref, computed, reactive } from 'vue'
+import { ref, computed, reactive, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '@/store/user'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -172,9 +172,26 @@ const userInfo = computed(() => userStore.userInfo)
 const role = computed(() => userStore.role)
 const isSuperAdmin = computed(() => userStore.userInfo?.adminRoleLevel === 1)
 const activeMenu = computed(() => route.path)
+const isMobile = ref(false)
+const asideWidth = computed(() => {
+  if (!isMobile.value) {
+    return isCollapse.value ? '64px' : '220px'
+  }
+  return isCollapse.value ? '0px' : '220px'
+})
 
 const toggleCollapse = () => {
   isCollapse.value = !isCollapse.value
+}
+
+const applyResponsiveLayout = () => {
+  const w = window.innerWidth || 1200
+  if (w <= 767) {
+    isMobile.value = true
+    isCollapse.value = true
+  } else {
+    isMobile.value = false
+  }
 }
 
 const displayName = computed(() => {
@@ -268,6 +285,15 @@ const handleUpdatePwd = async () => {
     }
   })
 }
+
+onMounted(() => {
+  applyResponsiveLayout()
+  window.addEventListener('resize', applyResponsiveLayout)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', applyResponsiveLayout)
+})
 </script>
 
 <style scoped>
@@ -366,6 +392,38 @@ const handleUpdatePwd = async () => {
   background-color: #f0f2f5;
   padding: 20px;
   overflow-y: auto;
+}
+
+@media (max-width: 767px) {
+  .logo {
+    height: 52px;
+    line-height: 52px;
+    font-size: 14px;
+  }
+
+  .app-header {
+    height: 52px;
+    padding: 0 10px;
+  }
+
+  .toggle-icon {
+    margin-right: 8px;
+  }
+
+  .welcome-text {
+    display: none;
+  }
+
+  .userinfo span {
+    max-width: 80px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .app-main {
+    padding: 12px;
+  }
 }
 
 .fade-transform-leave-active,

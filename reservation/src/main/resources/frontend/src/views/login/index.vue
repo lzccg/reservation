@@ -296,6 +296,7 @@ const handleRegisterCompany = () => {
 
 .login-box {
   width: 400px;
+  max-width: 92vw;
   background: #ffffff;
   border-radius: 12px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
@@ -306,6 +307,7 @@ const handleRegisterCompany = () => {
 
 .login-box.register-mode {
   width: 500px;
+  max-width: 92vw;
 }
 
 .login-header {
@@ -351,5 +353,34 @@ const handleRegisterCompany = () => {
 :deep(.el-input__wrapper.is-focus) {
   border-color: #409eff;
   box-shadow: 0 0 0 1px #409eff !important;
+}
+
+@media (max-width: 767px) {
+  .login-wrapper {
+    align-items: flex-start;
+    padding: 12px;
+  }
+
+  .login-box {
+    width: 100%;
+    max-width: 100%;
+    padding: 24px 16px;
+    margin-top: 12px;
+    max-height: calc(100vh - 24px);
+    overflow: auto;
+  }
+
+  .login-box.register-mode {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .login-header {
+    margin-bottom: 18px;
+  }
+
+  .login-header h2 {
+    font-size: 22px;
+  }
 }
 </style>

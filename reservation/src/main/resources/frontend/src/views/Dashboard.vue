@@ -82,30 +82,50 @@
 
       <el-row :gutter="20" style="margin-top: 20px;">
         <el-col :span="16">
-          <el-card shadow="hover" class="app-card">
+          <el-card shadow="hover" class="app-card panel-card">
             <template #header><div class="card-header">学院预约分布</div></template>
-            <div ref="companyChartRef" style="height: 350px; width: 100%;"></div>
+            <div ref="companyChartRef" class="company-chart"></div>
           </el-card>
         </el-col>
         <el-col :span="8">
-          <el-card shadow="hover" class="app-card">
+          <el-card shadow="hover" class="app-card panel-card latest-card">
             <template #header><div class="card-header">最新宣讲动态</div></template>
             <div class="latest-session-box">
-              <h3>{{ latestCompanySession ? latestCompanySession.sessionTitle : '-' }}</h3>
-              <p>
-                状态：
-                <el-tag :type="latestCompanySession ? mapSessionStatusType(latestCompanySession.sessionStatus) : 'info'">
+              <div class="latest-top">
+                <div class="latest-title">{{ latestCompanySession ? latestCompanySession.sessionTitle : '-' }}</div>
+                <el-tag
+                  :type="latestCompanySession ? mapSessionStatusType(latestCompanySession.sessionStatus) : 'info'"
+                  effect="dark"
+                >
                   {{ latestCompanySession ? latestCompanySession.statusText : '-' }}
                 </el-tag>
-              </p>
-              <p>时间：{{ latestCompanySession ? formatDateTime(latestCompanySession.startTime) : '-' }}</p>
-              <p>
-                容量：
-                <span v-if="latestCompanySession">
-                  已预约 {{ latestCompanySession.reservedCount }} / 总容量 {{ latestCompanySession.capacity }}
-                </span>
-                <span v-else>-</span>
-              </p>
+              </div>
+
+              <div class="latest-meta">
+                <div class="meta-row">
+                  <span class="meta-label">时间</span>
+                  <span class="meta-value">{{ latestCompanySession ? formatDateTime(latestCompanySession.startTime) : '-' }}</span>
+                </div>
+                <div class="meta-row">
+                  <span class="meta-label">容量</span>
+                  <span class="meta-value" v-if="latestCompanySession">
+                    已预约 {{ latestCompanySession.reservedCount }} / 总容量 {{ latestCompanySession.capacity }}
+                  </span>
+                  <span class="meta-value" v-else>-</span>
+                </div>
+              </div>
+
+              <div class="latest-progress" v-if="latestCompanySession && latestCompanySession.capacity">
+                <el-progress
+                  :percentage="calcPercent(latestCompanySession.reservedCount, latestCompanySession.capacity)"
+                  :stroke-width="10"
+                  :show-text="false"
+                />
+                <div class="progress-hint">
+                  <span>预约占比</span>
+                  <span>{{ calcPercent(latestCompanySession.reservedCount, latestCompanySession.capacity) }}%</span>
+                </div>
+              </div>
             </div>
             
             <div style="margin-top: 20px; color: #606266; font-size: 14px;">
@@ -249,6 +269,14 @@ const mapSessionStatusType = (status) => {
   return 'info'
 }
 
+const calcPercent = (reserved, capacity) => {
+  const r = Number(reserved || 0)
+  const c = Number(capacity || 0)
+  if (!c || c <= 0) return 0
+  const p = Math.round((r * 100) / c)
+  return Math.max(0, Math.min(100, p))
+}
+
 const fetchCompanyDashboard = async () => {
   try {
     const [summary, dist] = await Promise.all([
@@ -337,11 +365,118 @@ onUnmounted(() => {
 .card-header { font-weight: 600; color: #303133; }
 
 .latest-session-box {
-  background: #f5f7fa;
-  padding: 15px;
-  border-radius: 8px;
-  border-left: 4px solid #409EFF;
+  background: #f8fafc;
+  padding: 14px;
+  border-radius: 10px;
+  border: 1px solid #ebeef5;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.6);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
 }
-.latest-session-box h3 { margin-top: 0; margin-bottom: 10px; color: #303133; }
-.latest-session-box p { margin: 5px 0; color: #606266; font-size: 14px; }
+.latest-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.latest-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #303133;
+  line-height: 22px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.latest-meta {
+  background: #ffffff;
+  border: 1px solid #ebeef5;
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.meta-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+}
+
+.meta-row + .meta-row {
+  border-top: 1px dashed #ebeef5;
+}
+
+.meta-label {
+  color: #909399;
+  font-size: 13px;
+}
+
+.meta-value {
+  color: #303133;
+  font-size: 13px;
+  text-align: right;
+  word-break: break-all;
+}
+
+.latest-progress {
+  margin-top: 14px;
+  padding: 10px 12px;
+  background: #ffffff;
+  border: 1px solid #ebeef5;
+  border-radius: 8px;
+}
+
+.progress-hint {
+  margin-top: 8px;
+  display: flex;
+  justify-content: space-between;
+  color: #909399;
+  font-size: 12px;
+}
+
+.latest-card :deep(.el-card__body) {
+  height: 100%;
+}
+
+.panel-card {
+  height: 430px;
+  display: flex;
+  flex-direction: column;
+}
+
+.panel-card :deep(.el-card__header) {
+  flex: 0 0 auto;
+}
+
+.panel-card :deep(.el-card__body) {
+  flex: 1 1 auto;
+  overflow: hidden;
+}
+
+.company-chart {
+  width: 100%;
+  height: 100%;
+}
+
+@media (max-width: 767px) {
+  .panel-card {
+    height: auto;
+  }
+
+  .latest-card :deep(.el-card__body) {
+    height: auto;
+  }
+
+  .latest-session-box {
+    height: auto;
+  }
+}
 </style>
