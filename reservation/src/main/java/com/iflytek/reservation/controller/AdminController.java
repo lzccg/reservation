@@ -111,11 +111,15 @@ public class AdminController {
 
     @GetMapping("/companies")
     public Result<?> listCompanies(
+            HttpServletRequest request,
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) Integer status,
             @RequestParam(defaultValue = "1") long current,
             @RequestParam(defaultValue = "10") long size
     ) {
+        if (!isSuperAdmin(request)) {
+            return Result.error(403, "无权限访问");
+        }
         long safeCurrent = Math.max(1, current);
         long safeSize = Math.max(1, size);
         long offset = (safeCurrent - 1) * safeSize;
@@ -162,7 +166,10 @@ public class AdminController {
     }
 
     @GetMapping("/company/{id}")
-    public Result<?> companyDetail(@PathVariable("id") Long id) {
+    public Result<?> companyDetail(HttpServletRequest request, @PathVariable("id") Long id) {
+        if (!isSuperAdmin(request)) {
+            return Result.error(403, "无权限访问");
+        }
         Company c = companyService.getById(id);
         if (c == null) {
             return Result.error(404, "企业不存在");
@@ -172,7 +179,10 @@ public class AdminController {
     }
 
     @PostMapping("/company/{id}/audit")
-    public Result<?> auditCompany(@PathVariable("id") Long id, @RequestBody Map<String, Object> body) {
+    public Result<?> auditCompany(HttpServletRequest request, @PathVariable("id") Long id, @RequestBody Map<String, Object> body) {
+        if (!isSuperAdmin(request)) {
+            return Result.error(403, "无权限访问");
+        }
         Company company = companyService.getById(id);
         if (company == null) {
             return Result.error(404, "企业不存在");
@@ -235,11 +245,15 @@ public class AdminController {
 
     @GetMapping("/sessions")
     public Result<?> listSessions(
+            HttpServletRequest request,
             @RequestParam(required = false) String companyName,
             @RequestParam(required = false) Integer status,
             @RequestParam(defaultValue = "1") long current,
             @RequestParam(defaultValue = "10") long size
     ) {
+        if (!isSuperAdmin(request)) {
+            return Result.error(403, "无权限访问");
+        }
         long safeCurrent = Math.max(1, current);
         long safeSize = Math.max(1, size);
         long offset = (safeCurrent - 1) * safeSize;
@@ -321,7 +335,10 @@ public class AdminController {
     }
 
     @GetMapping("/session/{id}")
-    public Result<?> sessionDetail(@PathVariable("id") Long id) {
+    public Result<?> sessionDetail(HttpServletRequest request, @PathVariable("id") Long id) {
+        if (!isSuperAdmin(request)) {
+            return Result.error(403, "无权限访问");
+        }
         Session s = sessionMapper.selectById(id);
         if (s == null) {
             return Result.error(404, "宣讲会不存在");
@@ -341,7 +358,10 @@ public class AdminController {
     }
 
     @PostMapping("/session/{id}/audit")
-    public Result<?> auditSession(@PathVariable("id") Long id, @RequestBody Map<String, Object> body) {
+    public Result<?> auditSession(HttpServletRequest request, @PathVariable("id") Long id, @RequestBody Map<String, Object> body) {
+        if (!isSuperAdmin(request)) {
+            return Result.error(403, "无权限访问");
+        }
         Session existing = sessionMapper.selectById(id);
         if (existing == null) {
             return Result.error(404, "宣讲会不存在");
@@ -476,12 +496,16 @@ public class AdminController {
 
     @GetMapping("/students")
     public Result<?> listStudents(
+            HttpServletRequest request,
             @RequestParam(required = false) String clazz,
             @RequestParam(required = false) String major,
             @RequestParam(required = false) String keyword,
             @RequestParam(defaultValue = "1") long current,
             @RequestParam(defaultValue = "10") long size
     ) {
+        if (!isSuperAdmin(request)) {
+            return Result.error(403, "无权限访问");
+        }
         long safeCurrent = Math.max(1, current);
         long safeSize = Math.max(1, size);
         long offset = (safeCurrent - 1) * safeSize;
@@ -572,7 +596,10 @@ public class AdminController {
     }
 
     @PutMapping("/student/{id}/status")
-    public Result<?> updateStudentStatus(@PathVariable("id") Long id, @RequestBody Map<String, Object> body) {
+    public Result<?> updateStudentStatus(HttpServletRequest request, @PathVariable("id") Long id, @RequestBody Map<String, Object> body) {
+        if (!isSuperAdmin(request)) {
+            return Result.error(403, "无权限访问");
+        }
         Object statusObj = body.get("status");
         if (statusObj == null) {
             return Result.error("缺少status参数");
@@ -607,7 +634,10 @@ public class AdminController {
     }
 
     @GetMapping("/student/{id}")
-    public Result<?> studentDetail(@PathVariable("id") Long id) {
+    public Result<?> studentDetail(HttpServletRequest request, @PathVariable("id") Long id) {
+        if (!isSuperAdmin(request)) {
+            return Result.error(403, "无权限访问");
+        }
         Student student = studentService.getById(id);
         if (student == null || (student.getStatus() != null && student.getStatus() == 2)) {
             return Result.error(404, "用户不存在");
@@ -693,6 +723,21 @@ public class AdminController {
             result.put(sid, cnt);
         }
         return result;
+    }
+
+    private boolean isSuperAdmin(HttpServletRequest request) {
+        Long adminId = AuthTokenUtil.extractId(request);
+        if (adminId == null) {
+            return false;
+        }
+        com.iflytek.reservation.entity.Admin admin = adminService.getById(adminId);
+        if (admin == null) {
+            return false;
+        }
+        if (admin.getStatus() != null && admin.getStatus() == 0) {
+            return false;
+        }
+        return admin.getRole() != null && admin.getRole() == 1;
     }
 
     private Map<Long, Long> groupCountCheckin(List<Long> studentIds, int status) {

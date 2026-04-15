@@ -72,6 +72,38 @@ export const getStatisticsCompanySessions = (params) => {
   return request({ url: '/admin/statistics/company-sessions', method: 'get', params })
 }
 
+export const getTodaySessions = () => {
+  return request({ url: '/admin/statistics/today-sessions', method: 'get' })
+}
+
+export const markSessionStudentChecked = (data) => {
+  return request({ url: '/admin/statistics/session-detail/mark-checked', method: 'post', data })
+}
+
+export const getAdminAccounts = (params) => {
+  return request({ url: '/admin/admins', method: 'get', params })
+}
+
+export const createAdminAccount = (data) => {
+  return request({ url: '/admin/admins', method: 'post', data })
+}
+
+export const updateAdminAccountStatus = (adminId, status) => {
+  return request({ url: `/admin/admin/${adminId}/status`, method: 'put', params: { status } })
+}
+
+export const resetAdminAccountPassword = (adminId) => {
+  return request({ url: `/admin/admin/${adminId}/reset-password`, method: 'post' })
+}
+
+export const resetStudentPassword = (studentId) => {
+  return request({ url: `/admin/student/${studentId}/reset-password`, method: 'post' })
+}
+
+export const resetCompanyPassword = (companyId) => {
+  return request({ url: `/admin/company/${companyId}/reset-password`, method: 'post' })
+}
+
 export const getAdminDashboardSummary = () => {
   return request({ url: '/admin/dashboard/summary', method: 'get' })
 }

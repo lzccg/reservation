@@ -19,7 +19,7 @@ public class AdminServiceImpl extends ServiceImpl<AdminMapper, Admin> implements
     public Admin login(String username, String password) {
         Admin admin = getOne(new LambdaQueryWrapper<Admin>()
                 .eq(Admin::getAdminName, username));
-        if (admin != null) {
+        if (admin != null && (admin.getStatus() == null || admin.getStatus() == 1)) {
             // Check if password matches (handling both BCrypt and plain text for initial default admin)
             if (passwordEncoder.matches(password, admin.getPassword()) || password.equals(admin.getPassword())) {
                 return admin;

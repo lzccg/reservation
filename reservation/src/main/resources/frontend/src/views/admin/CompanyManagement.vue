@@ -46,11 +46,12 @@
             <el-tag :type="getStatusType(row.status)" :effect="getStatusEffect(row.status)">{{ getStatusName(row.status) }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="220" align="center" fixed="right">
+        <el-table-column label="操作" width="280" align="center" fixed="right">
           <template #default="{ row }">
             <el-button size="small" type="primary" link icon="List" @click="handleViewDetail(row)">
               {{ row.status === 0 ? '查看并审核' : '企业全息档案' }}
             </el-button>
+            <el-button v-if="row.status !== 3" size="small" type="warning" link @click="handleResetPwd(row)">重置密码</el-button>
             <el-button v-if="row.status === 1 || row.status === 2" size="small" type="danger" link @click="handleRemove(row)">注销企业</el-button>
           </template>
         </el-table-column>
@@ -107,7 +108,7 @@
 import { reactive, ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getCompanyList, getCompanyDetail, auditCompany, revokeCompany } from '@/api/admin'
+import { getCompanyList, getCompanyDetail, auditCompany, revokeCompany, resetCompanyPassword } from '@/api/admin'
 
 const router = useRouter()
 const searchForm = reactive({ keyword: '', status: '' })
@@ -207,6 +208,19 @@ const handleRemoveFromDialog = (row) => {
       fetchData()
     })
   }).catch(() => {})
+}
+
+const handleResetPwd = async (row) => {
+  if (!row?.companyId) return
+  try {
+    await ElMessageBox.confirm('确认将该用户密码重置（默认密码123456）？', '重置密码确认', { type: 'warning' })
+    await resetCompanyPassword(row.companyId)
+    ElMessage.success('重置成功')
+  } catch (e) {
+    if (e && e.message) {
+      console.error(e)
+    }
+  }
 }
 
 const handleReset = () => {

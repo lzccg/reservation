@@ -21,15 +21,16 @@
 
         <!-- 管理员菜单 -->
         <template v-if="role === 'admin'">
-          <el-sub-menu index="admin-users">
+          <el-sub-menu index="admin-users" v-if="isSuperAdmin">
             <template #title>
               <el-icon><User /></el-icon>
               <span>用户管理</span>
             </template>
+            <el-menu-item index="/admin/admins">管理员管理</el-menu-item>
             <el-menu-item index="/admin/students">学生管理</el-menu-item>
             <el-menu-item index="/admin/companies">企业管理</el-menu-item>
           </el-sub-menu>
-          <el-menu-item index="/admin/sessions">
+          <el-menu-item index="/admin/sessions" v-if="isSuperAdmin">
             <el-icon><DataAnalysis /></el-icon>
             <template #title>宣讲会调度</template>
           </el-menu-item>
@@ -37,7 +38,11 @@
             <el-icon><Monitor /></el-icon>
             <template #title>现场签到</template>
           </el-menu-item>
-          <el-menu-item index="/admin/statistics">
+          <el-menu-item index="/admin/today-sessions">
+            <el-icon><Calendar /></el-icon>
+            <template #title>今日宣讲会</template>
+          </el-menu-item>
+          <el-menu-item index="/admin/statistics" v-if="isSuperAdmin">
             <el-icon><PieChart /></el-icon>
             <template #title>全局统计</template>
           </el-menu-item>
@@ -165,6 +170,7 @@ const userStore = useUserStore()
 const isCollapse = ref(false)
 const userInfo = computed(() => userStore.userInfo)
 const role = computed(() => userStore.role)
+const isSuperAdmin = computed(() => userStore.userInfo?.adminRoleLevel === 1)
 const activeMenu = computed(() => route.path)
 
 const toggleCollapse = () => {

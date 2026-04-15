@@ -109,11 +109,6 @@
             </div>
             
             <div style="margin-top: 20px; color: #606266; font-size: 14px;">
-              <p>近期入驻宣讲高校榜单：</p>
-              <p>1. 清华大学</p>
-              <p>2. 北京大学</p>
-              <p>3. 浙江大学</p>
-              <p>4. 电子科技大学</p>
             </div>
           </el-card>
         </el-col>

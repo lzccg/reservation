@@ -51,6 +51,12 @@ const routes = [
         meta: { title: '学生管理', requiresAuth: true, role: 'admin' }
       },
       {
+        path: 'admin/admins',
+        name: 'AdminAdmins',
+        component: () => import('@/views/admin/AdminManagement.vue'),
+        meta: { title: '管理员管理', requiresAuth: true, role: 'admin' }
+      },
+      {
         path: 'admin/companies',
         name: 'AdminCompanies',
         component: () => import('@/views/admin/CompanyManagement.vue'),
@@ -73,6 +79,12 @@ const routes = [
         name: 'AdminCheckin',
         component: () => import('@/views/admin/CheckinAdmin.vue'),
         meta: { title: '现场签到', requiresAuth: true, role: 'admin' }
+      },
+      {
+        path: 'admin/today-sessions',
+        name: 'AdminTodaySessions',
+        component: () => import('@/views/admin/TodaySessions.vue'),
+        meta: { title: '今日宣讲会', requiresAuth: true, role: 'admin' }
       },
       // === Company Routes ===
       {
@@ -152,6 +164,13 @@ router.beforeEach((to, from, next) => {
     next('/login')
   } else if (to.meta.role && userStore.role !== to.meta.role) {
     next('/403') // 角色不匹配拦截
+  } else if (userStore.role === 'admin' && userStore.userInfo?.adminRoleLevel === 2) {
+    const allow = ['/dashboard', '/admin/checkin', '/admin/today-sessions', '/kiosk/checkin']
+    if (to.path.startsWith('/admin') && !allow.includes(to.path)) {
+      next('/admin/checkin')
+    } else {
+      next()
+    }
   } else {
     next()
   }

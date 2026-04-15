@@ -1,8 +1,10 @@
 package com.iflytek.reservation.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.iflytek.reservation.common.AuthTokenUtil;
 import com.iflytek.reservation.common.Result;
+import com.iflytek.reservation.entity.Admin;
 import com.iflytek.reservation.entity.Checkin;
 import com.iflytek.reservation.entity.Company;
 import com.iflytek.reservation.entity.Reservation;
@@ -13,6 +15,7 @@ import com.iflytek.reservation.mapper.CompanyMapper;
 import com.iflytek.reservation.mapper.ReservationMapper;
 import com.iflytek.reservation.mapper.SessionMapper;
 import com.iflytek.reservation.mapper.StudentMapper;
+import com.iflytek.reservation.service.AdminService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
@@ -22,8 +25,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -48,6 +54,9 @@ import java.util.stream.Collectors;
 public class AdminStatisticsController {
 
     @Autowired
+    private AdminService adminService;
+
+    @Autowired
     private SessionMapper sessionMapper;
 
     @Autowired
@@ -67,10 +76,9 @@ public class AdminStatisticsController {
                              @RequestParam(value = "startDate", required = false) String startDate,
                              @RequestParam(value = "endDate", required = false) String endDate,
                              @RequestParam(value = "companyId", required = false) Long companyId) {
-        Long adminId = AuthTokenUtil.extractId(request);
-        if (adminId == null) {
-            return Result.error(401, "未登录");
-        }
+        Admin op = getCurrentAdmin(request);
+        if (op == null) return Result.error(401, "未登录");
+        if (op.getRole() == null || op.getRole() != 1) return Result.error(403, "无权限访问");
         List<Session> sessions = querySessionsInRange(startDate, endDate, companyId);
         Set<Long> sessionIds = sessions.stream().map(Session::getSessionId).filter(Objects::nonNull).collect(Collectors.toSet());
         long sessionTotal = sessionIds.size();
@@ -97,10 +105,9 @@ public class AdminStatisticsController {
                               @RequestParam(value = "startDate", required = false) String startDate,
                               @RequestParam(value = "endDate", required = false) String endDate,
                               @RequestParam(value = "companyId", required = false) Long companyId) {
-        Long adminId = AuthTokenUtil.extractId(request);
-        if (adminId == null) {
-            return Result.error(401, "未登录");
-        }
+        Admin op = getCurrentAdmin(request);
+        if (op == null) return Result.error(401, "未登录");
+        if (op.getRole() == null || op.getRole() != 1) return Result.error(403, "无权限访问");
         List<Session> sessions = querySessionsInRange(startDate, endDate, companyId);
         if (sessions.isEmpty()) {
             return Result.success(List.of());
@@ -138,14 +145,63 @@ public class AdminStatisticsController {
         return Result.success(list);
     }
 
-    @GetMapping("/companies")
-    public Result<?> companyOptions(HttpServletRequest request,
-                                   @RequestParam(value = "startDate", required = false) String startDate,
-                                   @RequestParam(value = "endDate", required = false) String endDate) {
+    @GetMapping("/today-sessions")
+    public Result<?> todaySessions(HttpServletRequest request) {
         Long adminId = AuthTokenUtil.extractId(request);
         if (adminId == null) {
             return Result.error(401, "未登录");
         }
+        LocalDate today = LocalDate.now();
+        LocalDateTime from = today.atStartOfDay();
+        LocalDateTime to = today.plusDays(1).atStartOfDay();
+
+        List<Session> sessions = sessionMapper.selectList(new QueryWrapper<Session>()
+                .select("session_id", "company_id", "session_title", "start_time", "end_time", "session_status")
+                .isNotNull("start_time")
+                .ge("start_time", from)
+                .lt("start_time", to)
+                .in("session_status", 2, 3)
+                .orderByDesc("start_time"));
+        if (sessions.isEmpty()) {
+            return Result.success(List.of());
+        }
+        Set<Long> sessionIds = sessions.stream().map(Session::getSessionId).filter(Objects::nonNull).collect(Collectors.toSet());
+        Map<Long, Long> reserveCountBySession = groupCountReservationBySession(sessionIds);
+        Map<Long, Long> checkinCountBySession = groupCountCheckinBySession(sessionIds);
+
+        Set<Long> companyIds = sessions.stream().map(Session::getCompanyId).filter(Objects::nonNull).collect(Collectors.toSet());
+        Map<Long, Company> companyMap = companyIds.isEmpty() ? Map.of() : companyMapper.selectBatchIds(companyIds).stream()
+                .filter(Objects::nonNull)
+                .collect(Collectors.toMap(Company::getCompanyId, c -> c));
+
+        DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+        List<Map<String, Object>> list = new ArrayList<>();
+        for (Session s : sessions) {
+            long reserve = reserveCountBySession.getOrDefault(s.getSessionId(), 0L);
+            long checkin = checkinCountBySession.getOrDefault(s.getSessionId(), 0L);
+            Company c = s.getCompanyId() == null ? null : companyMap.get(s.getCompanyId());
+
+            Map<String, Object> row = new HashMap<>();
+            row.put("sessionId", s.getSessionId());
+            row.put("companyName", c == null ? "" : c.getCompanyName());
+            row.put("sessionTitle", s.getSessionTitle());
+            row.put("startTime", s.getStartTime());
+            row.put("endTime", s.getEndTime());
+            row.put("timeRange", buildTimeRange(s, fmt));
+            row.put("reserveCount", reserve);
+            row.put("checkinCount", checkin);
+            list.add(row);
+        }
+        return Result.success(list);
+    }
+
+    @GetMapping("/companies")
+    public Result<?> companyOptions(HttpServletRequest request,
+                                   @RequestParam(value = "startDate", required = false) String startDate,
+                                   @RequestParam(value = "endDate", required = false) String endDate) {
+        Admin op = getCurrentAdmin(request);
+        if (op == null) return Result.error(401, "未登录");
+        if (op.getRole() == null || op.getRole() != 1) return Result.error(403, "无权限访问");
         List<Session> sessions = querySessionsInRange(startDate, endDate, null);
         Set<Long> companyIds = sessions.stream().map(Session::getCompanyId).filter(Objects::nonNull).collect(Collectors.toSet());
         if (companyIds.isEmpty()) {
@@ -173,10 +229,9 @@ public class AdminStatisticsController {
                                     @RequestParam("companyId") Long companyId,
                                     @RequestParam(value = "startDate", required = false) String startDate,
                                     @RequestParam(value = "endDate", required = false) String endDate) {
-        Long adminId = AuthTokenUtil.extractId(request);
-        if (adminId == null) {
-            return Result.error(401, "未登录");
-        }
+        Admin op = getCurrentAdmin(request);
+        if (op == null) return Result.error(401, "未登录");
+        if (op.getRole() == null || op.getRole() != 1) return Result.error(403, "无权限访问");
         if (companyId == null) {
             return Result.error("缺少 companyId");
         }
@@ -204,12 +259,13 @@ public class AdminStatisticsController {
                                    @RequestParam(value = "type", required = false, defaultValue = "all") String type,
                                    @RequestParam(value = "current", required = false, defaultValue = "1") long current,
                                    @RequestParam(value = "size", required = false, defaultValue = "10") long size) {
-        Long adminId = AuthTokenUtil.extractId(request);
-        if (adminId == null) {
-            return Result.error(401, "未登录");
-        }
+        Admin op = getCurrentAdmin(request);
+        if (op == null) return Result.error(401, "未登录");
         if (sessionId == null) {
             return Result.error("缺少 sessionId");
+        }
+        if (op.getRole() != null && op.getRole() == 2 && !isTodaySession(sessionId)) {
+            return Result.error(403, "无权限访问");
         }
         Session session = sessionMapper.selectById(sessionId);
         if (session == null) {
@@ -249,12 +305,13 @@ public class AdminStatisticsController {
     public ResponseEntity<byte[]> exportSessionDetail(HttpServletRequest request,
                                                      @RequestParam("sessionId") Long sessionId,
                                                      @RequestParam(value = "includeCompany", required = false, defaultValue = "0") int includeCompany) throws Exception {
-        Long adminId = AuthTokenUtil.extractId(request);
-        if (adminId == null) {
-            return ResponseEntity.status(401).build();
-        }
+        Admin op = getCurrentAdmin(request);
+        if (op == null) return ResponseEntity.status(401).build();
         if (sessionId == null) {
             return ResponseEntity.badRequest().build();
+        }
+        if (op.getRole() != null && op.getRole() == 2 && !isTodaySession(sessionId)) {
+            return ResponseEntity.status(403).build();
         }
         Session session = sessionMapper.selectById(sessionId);
         if (session == null) {
@@ -305,6 +362,107 @@ public class AdminStatisticsController {
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename*=UTF-8''" + fileName)
                 .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
                 .body(out.toByteArray());
+    }
+
+    @PostMapping("/session-detail/mark-checked")
+    @Transactional
+    public Result<?> markChecked(HttpServletRequest request, @RequestBody MarkCheckedRequest body) {
+        Admin op = getCurrentAdmin(request);
+        if (op == null) return Result.error(401, "未登录");
+        if (body == null || body.getSessionId() == null || body.getStudentId() == null) {
+            return Result.error("参数错误");
+        }
+        Long sessionId = body.getSessionId();
+        if (op.getRole() != null && op.getRole() == 2 && !isTodaySession(sessionId)) {
+            return Result.error(403, "无权限访问");
+        }
+        Long studentId = body.getStudentId();
+
+        Long existingCheckin = checkinMapper.selectCount(new QueryWrapper<Checkin>()
+                .eq("session_id", sessionId)
+                .eq("student_id", studentId));
+        if (existingCheckin != null && existingCheckin > 0) {
+            return Result.error("已存在签到记录");
+        }
+
+        Reservation reservation = reservationMapper.selectOne(new QueryWrapper<Reservation>()
+                .eq("session_id", sessionId)
+                .eq("student_id", studentId)
+                .in("reservation_status", 0, 2, 3)
+                .orderByDesc("reservation_id")
+                .last("limit 1"));
+        if (reservation == null) {
+            return Result.error("未找到预约记录");
+        }
+        if (reservation.getReservationStatus() != null && reservation.getReservationStatus() == 2) {
+            return Result.error("该学生已签到");
+        }
+
+        Checkin checkin = new Checkin();
+        checkin.setSessionId(sessionId);
+        checkin.setStudentId(studentId);
+        checkin.setCheckinTime(LocalDateTime.now());
+        checkin.setCheckinStatus(0);
+        checkinMapper.insert(checkin);
+
+        int updated = reservationMapper.update(null, new UpdateWrapper<Reservation>()
+                .eq("reservation_id", reservation.getReservationId())
+                .in("reservation_status", 0, 3)
+                .set("reservation_status", 2));
+        if (updated <= 0) {
+            throw new IllegalArgumentException("更新预约状态失败");
+        }
+        return Result.success("操作成功");
+    }
+
+    private Admin getCurrentAdmin(HttpServletRequest request) {
+        Long adminId = AuthTokenUtil.extractId(request);
+        if (adminId == null) {
+            return null;
+        }
+        Admin admin = adminService.getById(adminId);
+        if (admin == null) {
+            return null;
+        }
+        if (admin.getStatus() != null && admin.getStatus() == 0) {
+            return null;
+        }
+        return admin;
+    }
+
+    private boolean isTodaySession(Long sessionId) {
+        if (sessionId == null) {
+            return false;
+        }
+        Session s = sessionMapper.selectById(sessionId);
+        if (s == null || s.getStartTime() == null) {
+            return false;
+        }
+        LocalDate today = LocalDate.now();
+        LocalDateTime from = today.atStartOfDay();
+        LocalDateTime to = today.plusDays(1).atStartOfDay();
+        return !s.getStartTime().isBefore(from) && s.getStartTime().isBefore(to);
+    }
+
+    public static class MarkCheckedRequest {
+        private Long sessionId;
+        private Long studentId;
+
+        public Long getSessionId() {
+            return sessionId;
+        }
+
+        public void setSessionId(Long sessionId) {
+            this.sessionId = sessionId;
+        }
+
+        public Long getStudentId() {
+            return studentId;
+        }
+
+        public void setStudentId(Long studentId) {
+            this.studentId = studentId;
+        }
     }
 
     private List<Session> querySessionsInRange(String startDate, String endDate, Long companyId) {

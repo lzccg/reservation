@@ -67,9 +67,10 @@
             <el-switch v-model="row.status" :active-value="1" :inactive-value="0" @change="handleStatusChange(row)" />
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="100" align="center" fixed="right">
+        <el-table-column label="操作" width="160" align="center" fixed="right">
           <template #default="{ row }">
             <el-button size="small" type="primary" link icon="View" @click="handleViewDetail(row)">详情</el-button>
+            <el-button size="small" type="warning" link @click="handleResetPwd(row)">重置密码</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -132,7 +133,7 @@
 import { reactive, ref, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/store/user'
-import { getStudentList, toggleStudentStatus, getStudentDetail, deleteStudent } from '@/api/admin'
+import { getStudentList, toggleStudentStatus, getStudentDetail, deleteStudent, resetStudentPassword } from '@/api/admin'
 
 const searchForm = reactive({ clazz: '', major: '', keyword: '' })
 const tableData = ref([])
@@ -212,6 +213,19 @@ const handleDeleteStudent = async () => {
     detailVisible.value = false
     currentStudent.value = null
     fetchData()
+  } catch (e) {
+    if (e && e.message) {
+      console.error(e)
+    }
+  }
+}
+
+const handleResetPwd = async (row) => {
+  if (!row?.studentId) return
+  try {
+    await ElMessageBox.confirm('确认将该用户密码重置（默认密码123456）？', '重置密码确认', { type: 'warning' })
+    await resetStudentPassword(row.studentId)
+    ElMessage.success('重置成功')
   } catch (e) {
     if (e && e.message) {
       console.error(e)
