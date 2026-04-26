@@ -16,6 +16,9 @@ import com.iflytek.reservation.mapper.SessionMapper;
 import com.iflytek.reservation.service.StudentService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -51,6 +54,9 @@ public class StudentHistoryController {
 
     @Autowired
     private CheckinMapper checkinMapper;
+
+    @Autowired(required = false)
+    private StringRedisTemplate stringRedisTemplate;
 
     @GetMapping("/history")
     public Result<?> history(HttpServletRequest request,
@@ -128,6 +134,25 @@ public class StudentHistoryController {
         sessionMapper.update(null, new UpdateWrapper<Session>()
                 .eq("session_id", reservation.getSessionId())
                 .setSql("remaining_seats = remaining_seats + 1"));
+
+        if (stringRedisTemplate != null) {
+            Long sid = reservation.getSessionId();
+            Long uid = studentId;
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    try {
+                        String seatKey = "session:seat:" + sid;
+                        String userSetKey = "session:reserved:" + sid;
+                        if (Boolean.TRUE.equals(stringRedisTemplate.hasKey(seatKey))) {
+                            stringRedisTemplate.opsForValue().increment(seatKey);
+                            stringRedisTemplate.opsForSet().remove(userSetKey, String.valueOf(uid));
+                        }
+                    } catch (Exception ignored) {
+                    }
+                }
+            });
+        }
 
         return Result.success("取消成功");
     }

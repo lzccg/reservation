@@ -12,6 +12,7 @@ import com.iflytek.reservation.mapper.SessionMapper;
 import com.iflytek.reservation.service.CompanyService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -39,6 +40,9 @@ public class CompanySessionController {
 
     @Autowired
     private CheckinMapper checkinMapper;
+
+    @Autowired(required = false)
+    private StringRedisTemplate stringRedisTemplate;
 
     private boolean isCompanyActive(Long companyId) {
         Company company = companyService.getById(companyId);
@@ -215,6 +219,18 @@ public class CompanySessionController {
                 .set("checkin_start", checkinStart)
                 .set("checkin_end", checkinEnd)
                 .set("update_time", LocalDateTime.now())) > 0;
+        if (ok && stringRedisTemplate != null) {
+            try {
+                String seatKey = "session:seat:" + id;
+                String userSetKey = "session:reserved:" + id;
+                Integer capacity = existing.getCapacity();
+                if (capacity != null) {
+                    stringRedisTemplate.opsForValue().set(seatKey, String.valueOf(capacity));
+                    stringRedisTemplate.delete(userSetKey);
+                }
+            } catch (Exception ignored) {
+            }
+        }
         return ok ? Result.success("已发布") : Result.error("发布失败");
     }
 
