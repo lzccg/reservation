@@ -11,7 +11,8 @@ export const uploadFaceInfo = (file) => {
     url: '/checkin/face-register',
     method: 'post',
     data: formData,
-    headers: { 'Content-Type': 'multipart/form-data' }
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 60000 // 单独给上传接口放宽到 60 秒
   })
 }
 
