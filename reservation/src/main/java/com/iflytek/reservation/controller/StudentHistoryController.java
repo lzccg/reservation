@@ -63,7 +63,7 @@ public class StudentHistoryController {
                              @RequestParam(value = "type", required = false, defaultValue = "all") String type,
                              @RequestParam(value = "current", required = false, defaultValue = "1") long current,
                              @RequestParam(value = "size", required = false, defaultValue = "10") long size) {
-        Long studentId = AuthTokenUtil.extractId(request);
+        Long studentId = AuthTokenUtil.extractStudentId(request);
         if (studentId == null) {
             return Result.error(401, "未登录");
         }
@@ -98,7 +98,7 @@ public class StudentHistoryController {
     @PostMapping("/reservation/cancel")
     @Transactional
     public Result<?> cancelReservation(HttpServletRequest request, @RequestParam("reservationId") Long reservationId) {
-        Long studentId = AuthTokenUtil.extractId(request);
+        Long studentId = AuthTokenUtil.extractStudentId(request);
         if (studentId == null) {
             return Result.error(401, "未登录");
         }
@@ -331,4 +331,3 @@ public class StudentHistoryController {
         return "unknown";
     }
 }
-

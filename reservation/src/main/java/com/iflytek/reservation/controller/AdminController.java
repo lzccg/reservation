@@ -66,8 +66,12 @@ public class AdminController {
 
     @GetMapping("/checkin/today-sessions")
     public Result<?> todayCheckinSessions(HttpServletRequest request) {
-        Long adminId = AuthTokenUtil.extractId(request);
+        Long adminId = AuthTokenUtil.extractAdminId(request);
         if (adminId == null) {
+            return Result.error(401, "未登录");
+        }
+        com.iflytek.reservation.entity.Admin admin = adminService.getById(adminId);
+        if (admin == null || (admin.getStatus() != null && admin.getStatus() == 0)) {
             return Result.error(401, "未登录");
         }
 
@@ -216,7 +220,7 @@ public class AdminController {
 
     @PostMapping("/company/{id}/revoke")
     public Result<?> revokeCompany(HttpServletRequest request, @PathVariable("id") Long id) {
-        Long adminId = com.iflytek.reservation.common.AuthTokenUtil.extractId(request);
+        Long adminId = com.iflytek.reservation.common.AuthTokenUtil.extractAdminId(request);
         if (adminId == null) {
             return Result.error(401, "未登录");
         }
@@ -678,7 +682,7 @@ public class AdminController {
 
     @DeleteMapping("/student/{id}")
     public Result<?> deleteStudent(HttpServletRequest request, @PathVariable("id") Long id) {
-        Long adminId = com.iflytek.reservation.common.AuthTokenUtil.extractId(request);
+        Long adminId = com.iflytek.reservation.common.AuthTokenUtil.extractAdminId(request);
         if (adminId == null) {
             return Result.error(401, "未登录");
         }
@@ -726,7 +730,7 @@ public class AdminController {
     }
 
     private boolean isSuperAdmin(HttpServletRequest request) {
-        Long adminId = AuthTokenUtil.extractId(request);
+        Long adminId = AuthTokenUtil.extractAdminId(request);
         if (adminId == null) {
             return false;
         }
@@ -768,4 +772,3 @@ public class AdminController {
                 .eq("checkin_status", status));
     }
 }
-

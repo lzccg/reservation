@@ -48,7 +48,7 @@ public class StudentSessionController {
 
     @GetMapping("/checkin/latest")
     public Result<?> latestReservedSession(HttpServletRequest request) {
-        Long studentId = AuthTokenUtil.extractId(request);
+        Long studentId = AuthTokenUtil.extractStudentId(request);
         if (studentId == null) {
             return Result.error(401, "未登录");
         }
@@ -105,7 +105,7 @@ public class StudentSessionController {
             @RequestParam(defaultValue = "1") long current,
             @RequestParam(defaultValue = "9") long size
     ) {
-        Long studentId = AuthTokenUtil.extractId(request);
+        Long studentId = AuthTokenUtil.extractStudentId(request);
         if (studentId == null) {
             return Result.error(401, "未登录");
         }
@@ -256,7 +256,7 @@ public class StudentSessionController {
 
     @GetMapping("/session/{id}")
     public Result<?> sessionDetail(HttpServletRequest request, @PathVariable("id") Long id) {
-        Long studentId = AuthTokenUtil.extractId(request);
+        Long studentId = AuthTokenUtil.extractStudentId(request);
         if (studentId == null) {
             return Result.error(401, "未登录");
         }
@@ -287,4 +287,3 @@ public class StudentSessionController {
         return Result.success(data);
     }
 }
-

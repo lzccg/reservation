@@ -57,7 +57,7 @@ public class CompanySessionController {
             @RequestParam(defaultValue = "1") long current,
             @RequestParam(defaultValue = "10") long size
     ) {
-        Long companyId = AuthTokenUtil.extractId(request);
+        Long companyId = AuthTokenUtil.extractCompanyId(request);
         if (companyId == null) {
             return Result.error(401, "未登录");
         }
@@ -99,7 +99,7 @@ public class CompanySessionController {
 
     @GetMapping("/session/{id}")
     public Result<?> sessionDetail(HttpServletRequest request, @PathVariable("id") Long id) {
-        Long companyId = AuthTokenUtil.extractId(request);
+        Long companyId = AuthTokenUtil.extractCompanyId(request);
         if (companyId == null) {
             return Result.error(401, "未登录");
         }
@@ -116,7 +116,7 @@ public class CompanySessionController {
 
     @PostMapping("/session")
     public Result<?> createSession(HttpServletRequest request, @RequestBody SessionUpsertRequest body) {
-        Long companyId = AuthTokenUtil.extractId(request);
+        Long companyId = AuthTokenUtil.extractCompanyId(request);
         if (companyId == null) {
             return Result.error(401, "未登录");
         }
@@ -150,7 +150,7 @@ public class CompanySessionController {
 
     @PutMapping("/session/{id}")
     public Result<?> updateSession(HttpServletRequest request, @PathVariable("id") Long id, @RequestBody SessionUpsertRequest body) {
-        Long companyId = AuthTokenUtil.extractId(request);
+        Long companyId = AuthTokenUtil.extractCompanyId(request);
         if (companyId == null) {
             return Result.error(401, "未登录");
         }
@@ -192,7 +192,7 @@ public class CompanySessionController {
 
     @PostMapping("/session/{id}/publish")
     public Result<?> publishSession(HttpServletRequest request, @PathVariable("id") Long id) {
-        Long companyId = AuthTokenUtil.extractId(request);
+        Long companyId = AuthTokenUtil.extractCompanyId(request);
         if (companyId == null) {
             return Result.error(401, "未登录");
         }
@@ -236,7 +236,7 @@ public class CompanySessionController {
 
     @PostMapping("/session/{id}/cancel")
     public Result<?> cancelSession(HttpServletRequest request, @PathVariable("id") Long id, @RequestBody(required = false) Map<String, Object> body) {
-        Long companyId = AuthTokenUtil.extractId(request);
+        Long companyId = AuthTokenUtil.extractCompanyId(request);
         if (companyId == null) {
             return Result.error(401, "未登录");
         }
@@ -328,4 +328,3 @@ public class CompanySessionController {
         }
     }
 }
-

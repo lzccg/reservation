@@ -50,7 +50,7 @@ public class CheckinController {
 
     @GetMapping("/face-status")
     public Result<?> faceStatus(HttpServletRequest request) {
-        Long studentId = AuthTokenUtil.extractId(request);
+        Long studentId = AuthTokenUtil.extractStudentId(request);
         if (studentId == null) {
             return Result.error(401, "未登录");
         }
@@ -59,7 +59,7 @@ public class CheckinController {
 
     @PostMapping(value = "/face-register", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public Result<?> faceRegister(HttpServletRequest request, @RequestPart("image") MultipartFile image) {
-        Long studentId = AuthTokenUtil.extractId(request);
+        Long studentId = AuthTokenUtil.extractStudentId(request);
         if (studentId == null) {
             return Result.error(401, "未登录");
         }
@@ -153,4 +153,3 @@ public class CheckinController {
         }
     }
 }
-

@@ -21,7 +21,7 @@ public class StudentController {
 
     @GetMapping("/profile")
     public Result<?> profile(HttpServletRequest request) {
-        Long id = AuthTokenUtil.extractId(request);
+        Long id = AuthTokenUtil.extractStudentId(request);
         if (id == null) {
             return Result.error(401, "未登录");
         }
@@ -35,7 +35,7 @@ public class StudentController {
 
     @PutMapping("/profile")
     public Result<?> updateProfile(HttpServletRequest request, @RequestBody StudentUpdateRequest body) {
-        Long id = AuthTokenUtil.extractId(request);
+        Long id = AuthTokenUtil.extractStudentId(request);
         if (id == null) {
             return Result.error(401, "未登录");
         }
@@ -105,4 +105,3 @@ public class StudentController {
         }
     }
 }
-

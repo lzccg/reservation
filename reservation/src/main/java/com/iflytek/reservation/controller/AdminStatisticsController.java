@@ -147,8 +147,8 @@ public class AdminStatisticsController {
 
     @GetMapping("/today-sessions")
     public Result<?> todaySessions(HttpServletRequest request) {
-        Long adminId = AuthTokenUtil.extractId(request);
-        if (adminId == null) {
+        Admin op = getCurrentAdmin(request);
+        if (op == null) {
             return Result.error(401, "未登录");
         }
         LocalDate today = LocalDate.now();
@@ -416,7 +416,7 @@ public class AdminStatisticsController {
     }
 
     private Admin getCurrentAdmin(HttpServletRequest request) {
-        Long adminId = AuthTokenUtil.extractId(request);
+        Long adminId = AuthTokenUtil.extractAdminId(request);
         if (adminId == null) {
             return null;
         }
@@ -612,4 +612,3 @@ public class AdminStatisticsController {
         }
     }
 }
-
