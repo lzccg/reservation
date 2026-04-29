@@ -175,7 +175,7 @@ const handleLogin = () => {
       try {
         const data = await login(loginForm)
         const { user, role, needCompleteProfile, adminRoleLevel } = data
-        userStore.setToken(`token-${user.id || user.studentId || user.companyId || user.adminId}`)
+        userStore.setToken(`token-${role}-${user.id || user.studentId || user.companyId || user.adminId}`)
         userStore.setUserInfo({ ...user, role, adminRoleLevel: adminRoleLevel ?? user.adminRoleLevel, isFirstLogin: !!needCompleteProfile })
         
         ElMessage.success('登录成功')

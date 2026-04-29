@@ -45,7 +45,7 @@ public class CompanyDashboardController {
 
     @GetMapping("/summary")
     public Result<?> summary(HttpServletRequest request) {
-        Long companyId = AuthTokenUtil.extractId(request);
+        Long companyId = AuthTokenUtil.extractCompanyId(request);
         if (companyId == null) {
             return Result.error(401, "未登录");
         }
@@ -98,7 +98,7 @@ public class CompanyDashboardController {
 
     @GetMapping("/college-distribution")
     public Result<?> collegeDistribution(HttpServletRequest request) {
-        Long companyId = AuthTokenUtil.extractId(request);
+        Long companyId = AuthTokenUtil.extractCompanyId(request);
         if (companyId == null) {
             return Result.error(401, "未登录");
         }
@@ -171,4 +171,3 @@ public class CompanyDashboardController {
         }
     }
 }
-

@@ -80,7 +80,7 @@ public class StudentReservationController {
     @PostMapping("/reserve/{sessionId}")
     @Transactional
     public Result<?> reserve(HttpServletRequest request, @PathVariable("sessionId") Long sessionId) {
-        Long studentId = AuthTokenUtil.extractId(request);
+        Long studentId = AuthTokenUtil.extractStudentId(request);
         if (studentId == null) {
             return Result.error(401, "未登录");
         }
@@ -205,4 +205,3 @@ public class StudentReservationController {
         }
     }
 }
-

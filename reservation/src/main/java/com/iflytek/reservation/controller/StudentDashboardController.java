@@ -45,7 +45,7 @@ public class StudentDashboardController {
 
     @GetMapping("/summary")
     public Result<?> summary(HttpServletRequest request) {
-        Long studentId = AuthTokenUtil.extractId(request);
+        Long studentId = AuthTokenUtil.extractStudentId(request);
         if (studentId == null) {
             return Result.error(401, "未登录");
         }
@@ -77,7 +77,7 @@ public class StudentDashboardController {
 
     @GetMapping("/industry-distribution")
     public Result<?> industryDistribution(HttpServletRequest request) {
-        Long studentId = AuthTokenUtil.extractId(request);
+        Long studentId = AuthTokenUtil.extractStudentId(request);
         if (studentId == null) {
             return Result.error(401, "未登录");
         }
@@ -119,4 +119,3 @@ public class StudentDashboardController {
         }
     }
 }
-

@@ -23,7 +23,7 @@ public class CompanyController {
 
     @GetMapping("/profile")
     public Result<?> profile(HttpServletRequest request) {
-        Long id = AuthTokenUtil.extractId(request);
+        Long id = AuthTokenUtil.extractCompanyId(request);
         if (id == null) {
             return Result.error(401, "未登录");
         }
@@ -37,7 +37,7 @@ public class CompanyController {
 
     @PutMapping("/profile")
     public Result<?> updateProfile(HttpServletRequest request, @RequestBody CompanyUpdateRequest body) {
-        Long id = AuthTokenUtil.extractId(request);
+        Long id = AuthTokenUtil.extractCompanyId(request);
         if (id == null) {
             return Result.error(401, "未登录");
         }
@@ -139,4 +139,3 @@ public class CompanyController {
         }
     }
 }
-

@@ -62,7 +62,7 @@ public class CompanyCheckinRecordsController {
                           @RequestParam(value = "status", required = false) String status,
                           @RequestParam(value = "current", required = false, defaultValue = "1") long current,
                           @RequestParam(value = "size", required = false, defaultValue = "10") long size) {
-        Long companyId = AuthTokenUtil.extractId(request);
+        Long companyId = AuthTokenUtil.extractCompanyId(request);
         if (companyId == null) {
             return Result.error(401, "未登录");
         }
@@ -119,7 +119,7 @@ public class CompanyCheckinRecordsController {
                                          @RequestParam("sessionId") Long sessionId,
                                          @RequestParam(value = "keyword", required = false) String keyword,
                                          @RequestParam(value = "status", required = false) String status) throws Exception {
-        Long companyId = AuthTokenUtil.extractId(request);
+        Long companyId = AuthTokenUtil.extractCompanyId(request);
         if (companyId == null) {
             return ResponseEntity.status(401).build();
         }
@@ -277,4 +277,3 @@ public class CompanyCheckinRecordsController {
         return start + " - " + end;
     }
 }
-

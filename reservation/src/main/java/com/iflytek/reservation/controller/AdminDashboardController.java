@@ -3,6 +3,7 @@ package com.iflytek.reservation.controller;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.iflytek.reservation.common.AuthTokenUtil;
 import com.iflytek.reservation.common.Result;
+import com.iflytek.reservation.entity.Admin;
 import com.iflytek.reservation.entity.Checkin;
 import com.iflytek.reservation.entity.Company;
 import com.iflytek.reservation.entity.Reservation;
@@ -13,6 +14,7 @@ import com.iflytek.reservation.mapper.CompanyMapper;
 import com.iflytek.reservation.mapper.ReservationMapper;
 import com.iflytek.reservation.mapper.SessionMapper;
 import com.iflytek.reservation.mapper.StudentMapper;
+import com.iflytek.reservation.service.AdminService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -33,6 +35,9 @@ import java.util.Objects;
 public class AdminDashboardController {
 
     @Autowired
+    private AdminService adminService;
+
+    @Autowired
     private StudentMapper studentMapper;
 
     @Autowired
@@ -49,8 +54,8 @@ public class AdminDashboardController {
 
     @GetMapping("/summary")
     public Result<?> summary(HttpServletRequest request) {
-        Long adminId = AuthTokenUtil.extractId(request);
-        if (adminId == null) {
+        Admin admin = getCurrentAdmin(request);
+        if (admin == null) {
             return Result.error(401, "未登录");
         }
 
@@ -80,8 +85,8 @@ public class AdminDashboardController {
 
     @GetMapping("/checkin-trend")
     public Result<?> checkinTrend(HttpServletRequest request) {
-        Long adminId = AuthTokenUtil.extractId(request);
-        if (adminId == null) {
+        Admin admin = getCurrentAdmin(request);
+        if (admin == null) {
             return Result.error(401, "未登录");
         }
 
@@ -126,8 +131,8 @@ public class AdminDashboardController {
 
     @GetMapping("/reservation-trend")
     public Result<?> reservationTrend(HttpServletRequest request) {
-        Long adminId = AuthTokenUtil.extractId(request);
-        if (adminId == null) {
+        Admin admin = getCurrentAdmin(request);
+        if (admin == null) {
             return Result.error(401, "未登录");
         }
 
@@ -182,5 +187,19 @@ public class AdminDashboardController {
             return null;
         }
     }
-}
 
+    private Admin getCurrentAdmin(HttpServletRequest request) {
+        Long adminId = AuthTokenUtil.extractAdminId(request);
+        if (adminId == null) {
+            return null;
+        }
+        Admin admin = adminService.getById(adminId);
+        if (admin == null) {
+            return null;
+        }
+        if (admin.getStatus() != null && admin.getStatus() == 0) {
+            return null;
+        }
+        return admin;
+    }
+}

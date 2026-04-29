@@ -201,7 +201,7 @@ public class AdminAccountController {
     }
 
     private Admin getCurrentAdmin(HttpServletRequest request) {
-        Long adminId = AuthTokenUtil.extractId(request);
+        Long adminId = AuthTokenUtil.extractAdminId(request);
         if (adminId == null) {
             return null;
         }
@@ -254,4 +254,3 @@ public class AdminAccountController {
         }
     }
 }
-
