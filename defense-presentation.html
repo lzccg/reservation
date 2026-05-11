@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>基于 Spring Boot 的校园宣讲会预约签到系统</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Noto Sans SC', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            overflow: hidden;
+        }
+
+        .presentation {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+
+        .slide {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            display: none;
+            background: white;
+            padding: 80px;
+            animation: fadeIn 0.5s ease;
+        }
+
+        .slide.active {
+            display: flex;
+            flex-direction: column;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        .slide-cover {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+
+        .slide-cover h1 {
+            font-size: 3.5rem;
+            font-weight: 700;
+            margin-bottom: 30px;
+            letter-spacing: 2px;
+        }
+
+        .slide-cover .subtitle {
+            font-size: 1.5rem;
+            font-weight: 300;
+            margin-bottom: 60px;
+            opacity: 0.9;
+        }
+
+        .slide-cover .info {
+            font-size: 1.2rem;
+            line-height: 2;
+            opacity: 0.85;
+        }
+
+        .slide-header {
+            margin-bottom: 60px;
+            padding-bottom: 20px;
+            border-bottom: 3px solid #667eea;
+        }
+
+        .slide-header h2 {
+            font-size: 2.5rem;
+            color: #333;
+            font-weight: 700;
+        }
+
+        .slide-content {
+            flex: 1;
+            font-size: 1.3rem;
+            line-height: 2;
+            color: #444;
+        }
+
+        .slide-content h3 {
+            color: #667eea;
+            font-size: 1.6rem;
+            margin: 30px 0 20px;
+            font-weight: 600;
+        }
+
+        .slide-content ul {
+            margin-left: 30px;
+        }
+
+        .slide-content li {
+            margin: 15px 0;
+        }
+
+        .toc-list {
+            list-style: none;
+            margin-left: 0 !important;
+        }
+
+        .toc-list li {
+            padding: 15px 25px;
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            margin: 20px 0;
+            border-radius: 5px;
+            transition: all 0.3s;
+        }
+
+        .toc-list li:hover {
+            background: #e9ecef;
+            transform: translateX(10px);
+        }
+
+        .tech-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 30px;
+            margin-top: 30px;
+        }
+
+        .tech-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+
+        .tech-card h4 {
+            font-size: 1.4rem;
+            margin-bottom: 15px;
+        }
+
+        .tech-card p {
+            font-size: 1rem;
+            opacity: 0.9;
+        }
+
+        .highlight-box {
+            background: linear-gradient(135deg, #ffeaa7 0%, #fdcb6e 100%);
+            padding: 25px;
+            border-radius: 10px;
+            margin: 20px 0;
+            border-left: 5px solid #f39c12;
+        }
+
+        .flow-diagram {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            margin: 40px 0;
+        }
+
+        .flow-item {
+            text-align: center;
+            padding: 20px;
+            background: #f0f0f0;
+            border-radius: 10px;
+            min-width: 120px;
+        }
+
+        .flow-arrow {
+            font-size: 2rem;
+            color: #667eea;
+        }
+
+        .slide-end {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+
+        .slide-end h1 {
+            font-size: 3rem;
+            margin-bottom: 40px;
+        }
+
+        .slide-end p {
+            font-size: 1.5rem;
+            opacity: 0.9;
+            margin: 20px 0;
+        }
+
+        .nav-controls {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 20px;
+            z-index: 1000;
+        }
+
+        .nav-btn {
+            background: rgba(255,255,255,0.9);
+            border: none;
+            padding: 15px 30px;
+            font-size: 1rem;
+            border-radius: 30px;
+            cursor: pointer;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.2);
+            transition: all 0.3s;
+            color: #667eea;
+            font-weight: 600;
+        }
+
+        .nav-btn:hover {
+            background: white;
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+        }
+
+        .nav-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .slide-counter {
+            position: fixed;
+            top: 30px;
+            right: 30px;
+            background: rgba(255,255,255,0.9);
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-weight: 600;
+            color: #667eea;
+            z-index: 1000;
+        }
+
+        .two-column {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+        }
+
+        .stat-card {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 10px 0;
+        }
+
+        .stat-card strong {
+            color: #667eea;
+            display: block;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="presentation">
+        <!-- Slide 1: Cover -->
+        <div class="slide slide-cover active" data-slide="1">
+            <h1>基于 Spring Boot 的校园宣讲会预约签到系统</h1>
+            <div class="subtitle">2026 届本科生毕业设计（论文）答辩</div>
+            <div class="info">
+                <p>答辩人：<strong>[您的姓名]</strong></p>
+                <p>学号：<strong>[您的学号]</strong></p>
+                <p>专业班级：<strong>[您的专业班级]</strong></p>
+                <p>指导老师：<strong>马旭涛 老师</strong></p>
+                <p>答辩日期：2026年5月</p>
+            </div>
+        </div>
+
+        <!-- Slide 2: Table of Contents -->
+        <div class="slide" data-slide="2">
+            <div class="slide-header">
+                <h2>目录</h2>
+            </div>
+            <div class="slide-content">
+                <ul class="toc-list">
+                    <li>01 研究背景与意义 —— 痛点分析与研究目标</li>
+                    <li>02 研究设计 —— 技术栈选型、系统架构与核心业务流</li>
+                    <li>03 核心创新点 —— 高并发抢座与人脸核验技术突破</li>
+                    <li>04 核心研究成果 —— 系统功能模块与效果展示</li>
+                    <li>05 系统测试与分析 —— 测试用例与运行表现</li>
+                    <li>06 研究结论与展望 —— 总结与未来规划</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Slide 3: Research Background -->
+        <div class="slide" data-slide="3">
+            <div class="slide-header">
+                <h2>01 研究背景</h2>
+            </div>
+            <div class="slide-content">
+                <h3>线下管理的痛点</h3>
+                <ul>
+                    <li>高校企业宣讲会场次日益增多，传统线下人工签到效率低下</li>
+                    <li>纸质打卡或普通二维码扫码入场拉长排队时间</li>
+                    <li>极易出现"代签"、"占座"以及"漏签"等不规范情况</li>
+                </ul>
+                <h3>传统信息化手段的不足</h3>
+                <ul>
+                    <li>普通预约系统缺乏有效的现场身份强校验机制</li>
+                    <li>无法确保到场人员与预约人员的真实一致性</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Slide 4: Research Significance & Goals -->
+        <div class="slide" data-slide="4">
+            <div class="slide-header">
+                <h2>01 研究意义与目标</h2>
+            </div>
+            <div class="slide-content">
+                <h3>业务闭环管理</h3>
+                <div class="flow-diagram">
+                    <div class="flow-item">企业发布活动</div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-item">学生在线预约</div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-item">现场刷脸打卡</div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-item">后台数据统计</div>
+                </div>
+                <h3>智能化升级（核心目标）</h3>
+                <div class="highlight-box">
+                    引入人工智能活体人脸识别技术，取代传统打卡。不仅大幅提升打卡准确率与效率，更从根本上保障了考勤数据的真实与安全。
+                </div>
+                <p>为高校智慧校园的行政信息化建设提供一种可行的现代化参考方案。</p>
+            </div>
+        </div>
+
+        <!-- Slide 5: Research Design - Tech Stack & Architecture -->
+        <div class="slide" data-slide="5">
+            <div class="slide-header">
+                <h2>02 研究设计 —— 技术路线与架构</h2>
+            </div>
+            <div class="slide-content">
+                <h3>总体架构：前后端分离架构设计</h3>
+                <div class="tech-grid">
+                    <div class="tech-card">
+                        <h4>后端技术</h4>
+                        <p>Spring Boot 框架提供稳定的业务逻辑支撑</p>
+                        <p>MyBatisPlus 框架操作 MySQL 数据库</p>
+                        <p>Redis 作为缓存层，缓解数据库压力</p>
+                    </div>
+                    <div class="tech-card">
+                        <h4>前端技术</h4>
+                        <p>Vue 框架构建用户界面</p>
+                        <p>Axios 与后端 API 进行异步数据交互</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 6: Research Design - System Roles & Business Flow -->
+        <div class="slide" data-slide="6">
+            <div class="slide-header">
+                <h2>02 研究设计 —— 系统角色与业务流</h2>
+            </div>
+            <div class="slide-content">
+                <h3>三大参与者维度</h3>
+                <div class="two-column">
+                    <div class="stat-card">
+                        <strong>学生端</strong>
+                        <p>完善基础资料与人脸图片底库</p>
+                        <p>浏览宣讲会</p>
+                        <p>抢座预约</p>
+                        <p>现场 1:N 人脸搜索打卡</p>
+                        <p>查阅记录</p>
+                    </div>
+                    <div class="stat-card">
+                        <strong>企业端</strong>
+                        <p>提交企业认证资质</p>
+                        <p>发布宣讲会（时间、地点、岗位等）</p>
+                        <p>获取签到报表</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <strong>管理员端</strong>
+                    <p>全局用户管理（资质审核）</p>
+                    <p>宣讲会内容审批调配</p>
+                    <p>核心数据全局统计分析</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 7: Core Innovation 1 - High Concurrency -->
+        <div class="slide" data-slide="7">
+            <div class="slide-header">
+                <h2>03 核心创新点一：高并发抢座处理</h2>
+            </div>
+            <div class="slide-content">
+                <h3>场景难点</h3>
+                <p>热门企业宣讲会发布后，瞬间会有大量学生同时发起预约请求，极易导致数据库崩溃或产生"超卖"（库存变为负数）现象。</p>
+                
+                <h3>解决方案（Redis + Lua）</h3>
+                <ul>
+                    <li>在学生预约环节，将宣讲会剩余座位数据同步至 Redis 缓存</li>
+                    <li>使用 Lua 原子脚本处理高并发下的库存扣减与用户防重判断，保障数据的一致性与操作的原子性</li>
+                </ul>
+                
+                <div class="highlight-box">
+                    <strong>兜底机制：</strong>通过 Spring 事务管理（@Transactional）与数据库乐观锁机制，双重保障最终落库数据的绝对正确
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 8: Core Innovation 2 - Face Recognition -->
+        <div class="slide" data-slide="8">
+            <div class="slide-header">
+                <h2>03 核心创新点二：人脸识别与防代签</h2>
+            </div>
+            <div class="slide-content">
+                <h3>底库建立与特征提取</h3>
+                <ul>
+                    <li>学生上传正面照</li>
+                    <li>系统后端调用 API 审核照片质量（限制 < 5MB 的单人正面照）</li>
+                    <li>合格后转化为人脸特征码并存入底库（绑定学生ID）</li>
+                </ul>
+                
+                <h3>现场 1:N 活体核验</h3>
+                <ul>
+                    <li>采用成熟的<strong>阿里云人脸人体 SDK（1:N 人脸搜索）</strong>接口</li>
+                    <li>现场设备捕捉图像发送至服务端，与底库数据比对</li>
+                    <li>当系统判断匹配置信度评分 > 80.0 且存在预约记录时，系统自动更新为"已签到"状态</li>
+                </ul>
+                <div class="highlight-box">
+                    从根本上避免了传统的纸质或二维码代签问题
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 9: Research Results 1 - Event Management -->
+        <div class="slide" data-slide="9">
+            <div class="slide-header">
+                <h2>04 核心研究成果 —— 宣讲会全链路调度</h2>
+            </div>
+            <div class="slide-content">
+                <h3>发布与审核规范化</h3>
+                <div class="flow-diagram">
+                    <div class="flow-item">企业申请发布</div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-item">待审状态</div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-item">管理员审批</div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-item">发布成功</div>
+                </div>
+                
+                <ul>
+                    <li>企业填写场地容量、时间等信息申请发布，数据进入"待审"状态</li>
+                    <li>管理员拥有"强制干预"权限，可对宣讲会进行审核通过、驳回甚至在活动前/中途"强制叫停"，保障校园活动的安全可控</li>
+                    <li>审核通过后，活动自动在学生大厅界面展示，进入预约生命周期</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Slide 10: Research Results 2 - Student Reservation -->
+        <div class="slide" data-slide="10">
+            <div class="slide-header">
+                <h2>04 核心研究成果 —— 学生预约与信息流转</h2>
+            </div>
+            <div class="slide-content">
+                <h3>预约机制完善</h3>
+                <ul>
+                    <li>学生可根据企业名称、日期范围模糊搜索宣讲会</li>
+                    <li>实时显示剩余名额，座位为 0 时拦截预约</li>
+                </ul>
+                
+                <h3>防"爽约"机制</h3>
+                <div class="highlight-box">
+                    支持学生在宣讲会开始前自主取消预约，取消后座位库存自动回退至奖池（Redis 与 MySQL 均回滚）
+                </div>
+                
+                <p>这样既保障了企业资源利用率，也给了学生灵活调整的空间。</p>
+            </div>
+        </div>
+
+        <!-- Slide 11: Research Results 3 - On-site Check-in -->
+        <div class="slide" data-slide="11">
+            <div class="slide-header">
+                <h2>04 核心研究成果 —— 现场无感签到</h2>
+            </div>
+            <div class="slide-content">
+                <h3>设备协同与状态判定</h3>
+                <ul>
+                    <li>管理员/企业在现场开启签到摄像头模块</li>
+                    <li>系统严格校验签到时间窗</li>
+                </ul>
+                
+                <div class="two-column">
+                    <div class="stat-card">
+                        <strong>正常签到</strong>
+                        <p>在设定时间（如宣讲会开始 15 分钟内）完成人脸识别 → 判定为"正常"</p>
+                    </div>
+                    <div class="stat-card">
+                        <strong>迟到</strong>
+                        <p>超出时间范围完成签到 → 精确标记为"迟到"状态</p>
+                    </div>
+                </div>
+                
+                <div class="highlight-box">
+                    未预约该场活动的人脸闯入时，系统予以拦截提示，保障会场秩序
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 12: Research Results 4 - Data Statistics -->
+        <div class="slide" data-slide="12">
+            <div class="slide-header">
+                <h2>04 核心研究成果 —— 数据统计与可视化</h2>
+            </div>
+            <div class="slide-content">
+                <h3>全局数据看板</h3>
+                <ul>
+                    <li>宣讲会总场次</li>
+                    <li>总预约人次</li>
+                    <li>实际签到人次</li>
+                    <li>整体签到率</li>
+                </ul>
+                
+                <h3>一键报表导出</h3>
+                <div class="highlight-box">
+                    支持通过 Apache POI 等技术，将某场活动的最终考勤明细（包含序号、姓名、学号、学院、班级、签到状态与时间）一键导出为 Excel 报表，极大地减轻了辅导员与校企核对数据的行政负担。
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 13: System Testing -->
+        <div class="slide" data-slide="13">
+            <div class="slide-header">
+                <h2>05 系统测试与分析</h2>
+            </div>
+            <div class="slide-content">
+                <h3>测试方案</h3>
+                <p>主要采用黑盒测试（功能测试），验证各接口输入输出是否符合规范定义</p>
+                
+                <h3>测试结果摘要</h3>
+                <ul>
+                    <li>覆盖了用户管理、宣讲会管理、预约模块、人脸签到模块 5 大核心场景的数十个测试用例</li>
+                    <li>包含异常流程测试：如无脸/多人脸上传报错拦截、名额满载限制、超时取消等均达到预期反馈</li>
+                </ul>
+                
+                <div class="highlight-box">
+                    <strong>结论：</strong>系统逻辑严谨，界面响应迅速，运行稳定可靠
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 14: Conclusion & Future Work -->
+        <div class="slide" data-slide="14">
+            <div class="slide-header">
+                <h2>06 研究结论与不足展望</h2>
+            </div>
+            <div class="slide-content">
+                <h3>研究结论</h3>
+                <p>本项目成功将 Spring Boot、Redis、人脸识别技术有效整合，达成预期目标，提升了校园活动组织效率，具有高度实用价值。</p>
+                
+                <h3>当前不足</h3>
+                <ul>
+                    <li>对人脸识别技术的理解主要停留在 SDK 接口调用层面，底层算法掌握尚不深入</li>
+                    <li>极端高并发下更细粒度的数据一致性处理还有优化空间</li>
+                </ul>
+                
+                <h3>未来展望</h3>
+                <p>进一步优化基础架构，横向扩展至校园学术讲座、文体比赛等其他活动场景，助力智慧校园无纸化全面普及。</p>
+            </div>
+        </div>
+
+        <!-- Slide 15: End -->
+        <div class="slide slide-end" data-slide="15">
+            <h1>感谢聆听</h1>
+            <p>感谢指导老师马老师在论文选题与设计过程中的悉心指导</p>
+            <p>感谢任课老师的知识传授与同学朋友的陪伴帮助</p>
+            <p style="margin-top: 60px; font-size: 2rem; font-weight: 700;">演示完毕，请各位评审老师批评指正</p>
+        </div>
+
+        <!-- Navigation Controls -->
+        <div class="nav-controls">
+            <button class="nav-btn" id="prevBtn" onclick="changeSlide(-1)">上一页</button>
+            <button class="nav-btn" id="nextBtn" onclick="changeSlide(1)">下一页</button>
+        </div>
+
+        <!-- Slide Counter -->
+        <div class="slide-counter" id="slideCounter">1 / 15</div>
+    </div>
+
+    <script>
+        let currentSlide = 1;
+        const totalSlides = 15;
+
+        function changeSlide(direction) {
+            const slides = document.querySelectorAll('.slide');
+            slides[currentSlide - 1].classList.remove('active');
+            
+            currentSlide += direction;
+            if (currentSlide < 1) currentSlide = 1;
+            if (currentSlide > totalSlides) currentSlide = totalSlides;
+            
+            slides[currentSlide - 1].classList.add('active');
+            updateUI();
+        }
+
+        function updateUI() {
+            document.getElementById('slideCounter').textContent = `${currentSlide} / ${totalSlides}`;
+            document.getElementById('prevBtn').disabled = currentSlide === 1;
+            document.getElementById('nextBtn').disabled = currentSlide === totalSlides;
+        }
+
+        // Keyboard navigation
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+                changeSlide(-1);
+            } else if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') {
+                changeSlide(1);
+            }
+        });
+
+        // Initialize
+        updateUI();
+    </script>
+</body>
+</html>
